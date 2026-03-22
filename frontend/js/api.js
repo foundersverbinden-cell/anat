@@ -1,5 +1,5 @@
 // Update this with your live Railway URL
-const API_BASE = 'https://your-backend.up.railway.app/api';
+const API_BASE = 'https://anat-production.up.railway.app/api';
 
 const api = {
     getToken: () => localStorage.getItem('token'),
