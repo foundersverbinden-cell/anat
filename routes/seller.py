@@ -168,3 +168,55 @@ def deliver_order(current_user):
     conn.close()
     
     return jsonify({'message': 'Order marked as delivered'}), 200
+@seller_bp.route('/dashboard', methods=['GET'])
+@token_required(allowed_roles=['seller'])
+def get_dashboard(current_user):
+    conn = get_db()
+    c = conn.cursor()
+    
+    # 1. Total Revenue (sum of price for VERIFIED or DELIVERED)
+    c.execute('''
+        SELECT SUM(p.price) as revenue
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        WHERE p.seller_id = ? AND o.status IN ('VERIFIED', 'DELIVERED')
+    ''', (current_user['id'],))
+    revenue = c.fetchone()['revenue'] or 0
+    
+    # 2. Total Orders (count)
+    c.execute('''
+        SELECT COUNT(o.id) as count
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        WHERE p.seller_id = ?
+    ''', (current_user['id'],))
+    orders_count = c.fetchone()['count'] or 0
+    
+    # 3. Total Views (sum of products.views)
+    # Note: views column added in migration
+    c.execute('SELECT SUM(views) as views FROM products WHERE seller_id = ?', (current_user['id'],))
+    views = c.fetchone()['views'] or 0
+    
+    # 4. Products
+    c.execute('SELECT * FROM products WHERE seller_id = ? ORDER BY created_at DESC', (current_user['id'],))
+    products = [dict(row) for row in c.fetchall()]
+    
+    # 5. Orders
+    c.execute('''
+        SELECT o.id, o.status, o.payment_proof, o.created_at, p.name as product_name, p.price, u.email as customer_email
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        JOIN users u ON o.customer_id = u.id
+        WHERE p.seller_id = ?
+        ORDER BY o.created_at DESC
+    ''', (current_user['id'],))
+    orders = [dict(row) for row in c.fetchall()]
+    
+    conn.close()
+    return jsonify({
+        'revenue': revenue,
+        'orders_count': orders_count,
+        'views': views,
+        'products': products,
+        'orders': orders
+    }), 200

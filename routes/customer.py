@@ -174,3 +174,16 @@ def get_orders(current_user):
     orders = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(orders), 200
+@customer_bp.route('/view', methods=['POST'])
+@token_required(allowed_roles=['customer'])
+def increment_view(current_user):
+    product_id = request.json.get('product_id')
+    if not product_id:
+        return jsonify({'error': 'Missing product_id'}), 400
+    
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE products SET views = views + 1 WHERE id = ?", (product_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'View recorded'}), 200

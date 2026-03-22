@@ -85,6 +85,13 @@ function openModal(productId) {
     const p = allProducts.find(x => x.id === productId);
     if(!p) return;
 
+    // Increment View Tracking (V5.1)
+    api.request('/customer/view', {
+        method: 'POST',
+        headers: api.getHeaders(),
+        body: JSON.stringify({ product_id: productId })
+    }).catch(e => console.error('View tracking failed', e));
+
     const modal = document.getElementById('product-modal');
     const body = document.getElementById('modal-body');
     const ctx = api.getSellerContext(p.seller_email);

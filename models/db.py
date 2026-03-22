@@ -45,11 +45,13 @@ def init_db():
         )
     ''')
     
-    # Safely try to add description column for existing databases
+    # Safely try to add columns for existing databases
     try:
         c.execute("ALTER TABLE products ADD COLUMN description TEXT DEFAULT ''")
-    except Exception:
-        pass # Column already exists
+    except Exception: pass
+    try:
+        c.execute("ALTER TABLE products ADD COLUMN views INTEGER DEFAULT 0")
+    except Exception: pass
 
     # 3. orders table with NEW schema
     c.execute('''
