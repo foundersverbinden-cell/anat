@@ -10,8 +10,8 @@ from routes.seller import seller_bp
 import time
 
 app = Flask(__name__)
-# Enable explicit CORS matching any origin for cross-domain Netlify frontend connection
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# Enable production CORS for Vercel
+CORS(app, resources={r"/api/*": {"origins": ["https://project-spdvs.vercel.app"]}})
 
 # Ensure upload directory exists
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
@@ -42,10 +42,6 @@ def check_rate_limit(key, limit, window):
 
 @app.before_request
 def anti_abuse():
-    # allow cors preflight
-    if request.method == "OPTIONS":
-        return
-        
     ip = request.remote_addr
     now = time.time()
     
