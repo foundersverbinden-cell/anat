@@ -1,30 +1,45 @@
 requireAuth('customer');
 
+let allProducts = [];
+
 async function loadProducts() {
     try {
-        const products = await api.request('/customer/products', { headers: api.getHeaders() });
-        const grid = document.getElementById('products-grid');
-        grid.innerHTML = '';
-        
-        if(products.length === 0) {
-            grid.innerHTML = '<p>No products available yet. Check back later!</p>';
-            return;
-        }
-        
-        products.forEach(p => {
-            grid.innerHTML += `
-                <div class="glass-panel card">
-                    <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
-                    <h3>${p.name}</h3>
-                    <p>Seller: ${p.seller_email}</p>
-                    <p class="price">₹${p.price}</p>
-                    <button class="btn btn-primary" onclick="buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Buy Now</button>
-                </div>
-            `;
-        });
+        allProducts = await api.request('/customer/products', { headers: api.getHeaders() });
+        displayProducts(allProducts);
     } catch (e) {
         console.error(e);
     }
+}
+
+function displayProducts(products) {
+    const grid = document.getElementById('products-grid');
+    grid.innerHTML = '';
+    
+    if(products.length === 0) {
+        grid.innerHTML = '<p>No products found matching your search.</p>';
+        return;
+    }
+    
+    products.forEach(p => {
+        grid.innerHTML += `
+            <div class="glass-panel card">
+                <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
+                <h3>${p.name}</h3>
+                <p style="margin-bottom: 0.5rem;">Seller: ${p.seller_email}</p>
+                <p class="price">₹${p.price}</p>
+                <button class="btn btn-primary" onclick="buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Buy Now</button>
+            </div>
+        `;
+    });
+}
+
+function filterProducts() {
+    const query = document.getElementById('product-search').value.toLowerCase();
+    const filtered = allProducts.filter(p => 
+        p.name.toLowerCase().includes(query) || 
+        p.seller_email.toLowerCase().includes(query)
+    );
+    displayProducts(filtered);
 }
 
 async function loadOrders() {
