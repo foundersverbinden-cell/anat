@@ -326,7 +326,8 @@ async function submitPayment(orderId) {
     const utrInput = document.getElementById(`utr-${orderId}`);
     const fileInput = document.getElementById(`proof-${orderId}`);
     
-    if(!utrInput.value || !re.match(/^\d{12}$/, utrInput.value)) {
+    // Fix: regex.test() instead of re.match()
+    if(!utrInput.value || !/^\d{12}$/.test(utrInput.value)) {
         return api.showToast('Please enter a valid 12-digit UTR ID', 'error');
     }
     if(!fileInput.files[0]) {
@@ -345,8 +346,23 @@ async function submitPayment(orderId) {
             headers: api.getHeaders(true),
             body: formData
         });
-        api.showToast('Payment submitted! Verification in progress.', 'success');
-        loadOrders();
+        
+        // Refined Success State
+        api.showToast('✨ Payment submitted! Our team is verifying your vibe.', 'success');
+        
+        // Confirmed Success UI
+        const card = utrInput.closest('.card');
+        if(card) {
+            card.innerHTML = `
+                <div style="text-align: center; padding: 2rem; animation: scaleUp 0.5s ease-out;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🚀</div>
+                    <h3 style="color: var(--primary);">Payment Received!</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Check your timeline for verification updates.</p>
+                </div>
+            `;
+        }
+        
+        setTimeout(loadOrders, 2000);
     } catch (e) {
         console.error(e);
         api.showToast(e.message || 'Upload failed', 'error');
@@ -362,5 +378,13 @@ function toggleView(viewId) {
     if(viewId === 'orders-view') loadOrders();
 }
 
-// Initial load
+// Initial load & Polling
 loadProducts();
+
+// V6.1 Buyer-side polling (5s)
+setInterval(() => {
+    const ordersView = document.getElementById('orders-view');
+    if(ordersView && !ordersView.classList.contains('hidden')) {
+        loadOrders();
+    }
+}, 5000);
