@@ -59,13 +59,27 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             product_id INTEGER NOT NULL,
             customer_id INTEGER NOT NULL,
-            status TEXT NOT NULL CHECK(status IN ('CREATED', 'PAYMENT_PENDING', 'PAYMENT_UPLOADED', 'VERIFIED', 'DELIVERED', 'CANCELLED', 'NEEDS_ATTENTION')),
+            status TEXT NOT NULL CHECK(status IN ('CREATED', 'PAYMENT_PENDING', 'PAYMENT_UPLOADED', 'VERIFIED', 'DELIVERED', 'CANCELLED', 'NEEDS_ATTENTION', 'EXPIRED', 'REJECTED')),
             payment_proof TEXT,
+            utr_id TEXT,
+            rejection_reason TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE,
             FOREIGN KEY(customer_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
+    
+    # Safely try to add columns for existing databases
+    try:
+        c.execute("ALTER TABLE orders ADD COLUMN utr_id TEXT")
+    except Exception: pass
+    try:
+        c.execute("ALTER TABLE orders ADD COLUMN rejection_reason TEXT")
+    except Exception: pass
+    try:
+        c.execute("ALTER TABLE orders ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    except Exception: pass
 
     # Copy old data if migrating
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders_old';")

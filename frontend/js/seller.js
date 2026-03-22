@@ -85,58 +85,79 @@ function renderProducts(products) {
         `).join('');
 }
 
-function renderOrders(orders) {
-    const grid = document.getElementById('seller-orders-grid');
-    if (!grid) return;
-    grid.innerHTML = orders.length === 0 
-        ? '<div class="glass-panel" style="padding: 2rem; text-align: center;">No incoming orders yet.</div>'
-        : orders.map(o => {
-            let statusColor = 'var(--warning)';
-            if (o.status === 'VERIFIED' || o.status === 'DELIVERED') statusColor = 'var(--success)';
-            if (o.status === 'CANCELLED' || o.status === 'REJECTED') statusColor = 'var(--danger)';
+function renderOrders() {
+    const list = document.getElementById('seller-orders-grid');
+    if (!list) return;
 
-            return `
-                <div class="glass-panel" style="margin-bottom: 1rem; padding: 1.25rem;">
-                    <div class="d-flex justify-between" style="align-items: center; flex-wrap: wrap; gap: 1rem;">
-                        <div class="d-flex" style="gap: 1.5rem; align-items: center;">
-                            <div style="background: var(--glass); padding: 5px; border-radius: 8px;">
-                                <img src="${IMAGE_BASE}/${o.payment_proof || 'placeholder.png'}" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover; cursor: pointer;" onclick="window.open('${IMAGE_BASE}/${o.payment_proof}', '_blank')">
-                            </div>
-                            <div>
-                                <h4 style="margin:0;">${o.product_name}</h4>
-                                <p style="font-size: 0.8rem; color: var(--text-muted);">${o.customer_email}</p>
-                            </div>
-                        </div>
-                        
-                        <div style="flex: 1; min-width: 120px; text-align: center;">
-                            <span class="badge" style="background: ${statusColor}; font-size: 0.7rem; letter-spacing: 1px;">${o.status}</span>
-                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">₹${o.price}</p>
-                        </div>
+    if (dashboardState.orders.length === 0) {
+        list.innerHTML = '<div class="glass-panel" style="padding: 2rem; text-align: center; color: var(--text-muted);">No orders yet.</div>';
+        return;
+    }
 
-                        <div class="d-flex" style="gap: 0.5rem;">
-                            ${(o.status === 'PAYMENT_UPLOADED' || o.status === 'NEEDS_ATTENTION') ? `
-                                <button class="btn btn-primary btn-small" style="background: var(--success);" onclick="handleOrderAction(${o.id}, 'approve')">Approve</button>
-                                <button class="btn btn-outline btn-small" style="color: var(--danger); border-color: var(--danger);" onclick="handleOrderAction(${o.id}, 'reject')">Reject</button>
-                            ` : ''}
-                            ${o.status === 'VERIFIED' ? `
-                                <button class="btn btn-primary btn-small" style="background: var(--primary);" onclick="handleOrderAction(${o.id}, 'deliver')">Mark Delivered</button>
-                            ` : ''}
+    list.innerHTML = dashboardState.orders.map(o => {
+        let statusColor = 'var(--warning)';
+        if (o.status === 'VERIFIED' || o.status === 'DELIVERED') statusColor = 'var(--success)';
+        if (o.status === 'REJECTED' || o.status === 'CANCELLED' || o.status === 'EXPIRED') statusColor = 'var(--danger)';
+        if (o.status === 'PAYMENT_UPLOADED' || o.status === 'NEEDS_ATTENTION') statusColor = 'var(--accent-blue)';
+
+        const buyerName = o.customer_email.split('@')[0];
+        const timeAgo = o.updated_at ? api.formatTimeAgo(o.updated_at) : 'Just now';
+
+        return `
+            <div class="glass-panel order-card" style="padding: 1.25rem; margin-bottom: 1rem; border-left: 4px solid ${statusColor};">
+                <div class="d-flex justify-between" style="align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div class="d-flex" style="gap: 1.25rem; align-items: center;">
+                        <div style="background: white; padding: 4px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                            <img src="${IMAGE_BASE}/${o.payment_proof || 'placeholder.png'}" 
+                                 style="width: 50px; height: 50px; border-radius: 4px; object-fit: cover; cursor: zoom-in;" 
+                                 onclick="window.open('${IMAGE_BASE}/${o.payment_proof}', '_blank')"
+                                 title="Click to zoom proof">
+                        </div>
+                        <div>
+                            <h4 style="margin:0; font-size: 1.1rem;">${o.product_name}</h4>
+                            <p style="font-size: 0.85rem; color: var(--text-main); font-weight: 600;">👤 ${buyerName} <span style="font-weight: 400; color: var(--text-muted);">(${o.customer_email})</span></p>
+                            ${o.utr_id ? `<p style="font-size: 0.75rem; color: var(--accent-blue); font-weight: 700; background: rgba(0,200,255,0.1); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;">UTR: ${o.utr_id}</p>` : ''}
                         </div>
                     </div>
+                    
+                    <div style="flex: 1; min-width: 140px; text-align: right;">
+                        <span class="badge" style="background: ${statusColor}; font-size: 0.75rem;">${o.status.replace('_', ' ')}</span>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">₹${o.price} • ${timeAgo}</p>
+                        ${o.rejection_reason ? `<p style="font-size: 0.7rem; color: var(--danger); margin-top: 0.25rem; font-style: italic;">"${o.rejection_reason}"</p>` : ''}
+                    </div>
+
+                    <div class="d-flex" style="gap: 0.5rem;">
+                        ${(o.status === 'PAYMENT_UPLOADED' || o.status === 'NEEDS_ATTENTION') ? `
+                            <button class="btn btn-primary btn-small" style="background: var(--success); border:none;" onclick="handleOrderAction(${o.id}, 'approve')">Approve</button>
+                            <button class="btn btn-outline btn-small" style="color: var(--danger); border-color: var(--danger);" onclick="handleOrderAction(${o.id}, 'reject')">Reject</button>
+                        ` : ''}
+                        ${o.status === 'VERIFIED' ? `
+                            <button class="btn btn-primary btn-small" style="background: var(--primary);" onclick="handleOrderAction(${o.id}, 'deliver')">Mark Delivered</button>
+                        ` : ''}
+                    </div>
                 </div>
-            `;
-        }).join('');
+            </div>
+        `;
+    }).join('');
 }
 
 // --- Optimistic UI Actions ---
 async function handleOrderAction(orderId, action) {
+    let reason = '';
+    if (action === 'reject') {
+        reason = prompt("Enter rejection reason (e.g. Amount mismatch, Invalid UTR):");
+        if (reason === null) return; // Cancelled
+    }
+
     const orderIndex = dashboardState.orders.findIndex(o => o.id === orderId);
     if (orderIndex === -1) return;
 
-    const originalStatus = dashboardState.orders[orderIndex].status;
+    const originalState = { ...dashboardState.orders[orderIndex] };
     const newStatus = action === 'approve' ? 'VERIFIED' : (action === 'deliver' ? 'DELIVERED' : 'REJECTED');
     
+    // Optimistic Update
     dashboardState.orders[orderIndex].status = newStatus;
+    if (action === 'reject') dashboardState.orders[orderIndex].rejection_reason = reason;
     renderDashboard();
 
     try {
@@ -144,11 +165,13 @@ async function handleOrderAction(orderId, action) {
         await api.request(endpoint, {
             method: 'POST',
             headers: api.getHeaders(),
-            body: JSON.stringify({ order_id: orderId, action })
+            body: JSON.stringify({ order_id: orderId, action, reason })
         });
+        api.showToast(`Order ${action}ed successfuly`, 'success');
         fetchDashboard(true);
     } catch (e) {
-        dashboardState.orders[orderIndex].status = originalStatus;
+        api.showToast(e.message || 'Action failed', 'error');
+        dashboardState.orders[orderIndex] = originalState;
         renderDashboard();
     }
 }

@@ -114,9 +114,15 @@ def create_order(current_user):
 @token_required(allowed_roles=['customer'])
 def upload_proof(current_user):
     order_id = request.form.get('order_id')
-    if 'proof' not in request.files or not order_id:
-        return jsonify({'error': 'Missing file or order ID'}), 400
+    utr_id = request.form.get('utr_id')
+    
+    if 'proof' not in request.files or not order_id or not utr_id:
+        return jsonify({'error': 'Missing file, UTR ID, or order ID'}), 400
         
+    # UTR ID Validation (basic 12-digit check for UPI)
+    if not re.match(r'^\d{12}$', utr_id):
+         return jsonify({'error': 'Invalid UTR ID. Must be 12 digits.'}), 400
+
     file = request.files['proof']
     filename = save_upload(file, current_app.config['UPLOAD_FOLDER'])
     if not filename:
@@ -125,6 +131,12 @@ def upload_proof(current_user):
     conn = get_db()
     c = conn.cursor()
     
+    # Check for Duplicate UTR
+    c.execute("SELECT id FROM orders WHERE utr_id = ? AND status != 'CANCELLED'", (utr_id,))
+    if c.fetchone():
+        conn.close()
+        return jsonify({'error': 'Duplicate UTR ID. This payment has already been submitted.'}), 409
+
     c.execute("SELECT status FROM orders WHERE id = ? AND customer_id = ?", (order_id, current_user['id']))
     order = c.fetchone()
     
@@ -132,19 +144,19 @@ def upload_proof(current_user):
         conn.close()
         return jsonify({'error': 'Order not found or unauthorized'}), 404
         
-    if order['status'] != 'PAYMENT_PENDING':
+    if order['status'] not in ['PAYMENT_PENDING', 'REJECTED']:
         conn.close()
         return jsonify({'error': 'Invalid state transition'}), 400
 
     c.execute(
-        "UPDATE orders SET status = 'PAYMENT_UPLOADED', payment_proof = ? WHERE id = ?",
-        (filename, order_id)
+        "UPDATE orders SET status = 'PAYMENT_UPLOADED', payment_proof = ?, utr_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (filename, utr_id, order_id)
     )
     conn.commit()
-    log_audit('PAYMENT_UPLOADED', current_user['id'], f"Uploaded proof for order {order_id}", request.remote_addr)
+    log_audit('PAYMENT_UPLOADED', current_user['id'], f"Uploaded proof {utr_id} for order {order_id}", request.remote_addr)
     conn.close()
     
-    return jsonify({'message': 'Payment proof uploaded successfully', 'proof_image': filename}), 200
+    return jsonify({'message': 'Payment proof submitted for verification', 'proof_image': filename, 'utr_id': utr_id}), 200
 
 @customer_bp.route('/orders', methods=['GET'])
 @token_required(allowed_roles=['customer'])
@@ -152,20 +164,21 @@ def get_orders(current_user):
     conn = get_db()
     c = conn.cursor()
     
-    # Run 15m timeout check
+    # Run 24h expiry check (Enhanced from 15m)
     c.execute("SELECT id, status, created_at FROM orders WHERE customer_id = ?", (current_user['id'],))
     db_orders = c.fetchall()
     now = datetime.datetime.utcnow()
     for o in db_orders:
         if o['status'] == 'PAYMENT_PENDING':
             order_time = datetime.datetime.strptime(o['created_at'], '%Y-%m-%d %H:%M:%S')
-            if (now - order_time).total_seconds() > 15 * 60:
-                c.execute("UPDATE orders SET status = 'CANCELLED' WHERE id = ?", (o['id'],))
-                log_audit('ORDER_TIMEOUT', current_user['id'], f"Order {o['id']} cancelled due to timeout")
+            # 24 Hour Expiry as per requirement 7
+            if (now - order_time).total_seconds() > 24 * 60 * 60:
+                c.execute("UPDATE orders SET status = 'EXPIRED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (o['id'],))
+                log_audit('ORDER_EXPIRED', current_user['id'], f"Order {o['id']} expired after 24h")
     conn.commit()
 
     c.execute('''
-        SELECT o.id, o.status, p.name, p.price, p.upi_id, o.created_at
+        SELECT o.id, o.status, o.utr_id, o.rejection_reason, p.name, p.price, p.upi_id, o.created_at, o.updated_at
         FROM orders o
         JOIN products p ON o.product_id = p.id
         WHERE o.customer_id = ?

@@ -103,6 +103,7 @@ def verify_payment(current_user):
     data = request.json
     order_id = data.get('order_id')
     action = data.get('action') # 'approve' or 'reject'
+    reason = data.get('reason', '') # Rejection reason
     
     if not order_id or action not in ('approve', 'reject'):
         return jsonify({'error': 'Invalid parameters'}), 400
@@ -122,17 +123,26 @@ def verify_payment(current_user):
         conn.close()
         return jsonify({'error': 'Order not found or unauthorized'}), 404
         
-    if order['status'] not in ('PAYMENT_UPLOADED', 'NEEDS_ATTENTION'):
+    if order['status'] not in ('PAYMENT_UPLOADED', 'NEEDS_ATTENTION', 'REJECTED'):
         conn.close()
-        return jsonify({'error': 'Invalid state transition. Order must have proof uploaded.'}), 400
+        return jsonify({'error': 'Invalid state transition.'}), 400
         
-    new_status = 'VERIFIED' if action == 'approve' else 'PAYMENT_PENDING'
-    c.execute("UPDATE orders SET status = ? WHERE id = ?", (new_status, order_id))
+    if action == 'approve':
+        new_status = 'VERIFIED'
+        rejection_reason = None
+    else:
+        new_status = 'REJECTED'
+        rejection_reason = reason if reason else 'Payment not verified'
+
+    c.execute(
+        "UPDATE orders SET status = ?, rejection_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_status, rejection_reason, order_id)
+    )
     conn.commit()
     log_audit('ORDER_VERIFIED', current_user['id'], f"Order {order_id} {action}d -> {new_status}")
     conn.close()
     
-    return jsonify({'message': f"Order payment {action}d. Status is now {new_status}"}), 200
+    return jsonify({'message': f"Order payment {action}d. Status is now {new_status}", 'status': new_status}), 200
 
 @seller_bp.route('/deliver', methods=['POST'])
 @token_required(allowed_roles=['seller'])
@@ -162,12 +172,13 @@ def deliver_order(current_user):
         conn.close()
         return jsonify({'error': 'Invalid state transition. Order must be verified.'}), 400
         
-    c.execute("UPDATE orders SET status = 'DELIVERED' WHERE id = ?", (order_id,))
+    c.execute("UPDATE orders SET status = 'DELIVERED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (order_id,))
     conn.commit()
     log_audit('ORDER_DELIVERED', current_user['id'], f"Order {order_id} delivered")
     conn.close()
     
     return jsonify({'message': 'Order marked as delivered'}), 200
+
 @seller_bp.route('/dashboard', methods=['GET'])
 @token_required(allowed_roles=['seller'])
 def get_dashboard(current_user):
@@ -193,7 +204,6 @@ def get_dashboard(current_user):
     orders_count = c.fetchone()['count'] or 0
     
     # 3. Total Views (sum of products.views)
-    # Note: views column added in migration
     c.execute('SELECT SUM(views) as views FROM products WHERE seller_id = ?', (current_user['id'],))
     views = c.fetchone()['views'] or 0
     
@@ -201,9 +211,10 @@ def get_dashboard(current_user):
     c.execute('SELECT * FROM products WHERE seller_id = ? ORDER BY created_at DESC', (current_user['id'],))
     products = [dict(row) for row in c.fetchall()]
     
-    # 5. Orders
+    # 5. Orders (Enhanced for UPI Trust System)
     c.execute('''
-        SELECT o.id, o.status, o.payment_proof, o.created_at, p.name as product_name, p.price, u.email as customer_email
+        SELECT o.id, o.status, o.payment_proof, o.utr_id, o.rejection_reason, o.created_at, o.updated_at,
+               p.name as product_name, p.price, u.email as customer_email
         FROM orders o
         JOIN products p ON o.product_id = p.id
         JOIN users u ON o.customer_id = u.id

@@ -526,3 +526,37 @@ input#product-search:focus {
     object-fit: cover;
     border-radius: 4px;
 }
+
+/* --- V6 Trust System UI --- */
+.toast {
+    animation: slideUp 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%) scale(0.9); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.order-timeline div[style*="border-radius:50%"] {
+    transition: background 0.5s ease, border-color 0.5s ease;
+}
+
+.order-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
+.badge-verified {
+    font-size: 0.8rem;
+    color: var(--primary);
+    filter: drop-shadow(0 0 5px var(--primary));
+}
+
+@media (max-width: 768px) {
+    .order-timeline span { font-size: 0.6rem !important; }
+}

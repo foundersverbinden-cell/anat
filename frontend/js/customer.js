@@ -227,78 +227,129 @@ async function loadOrders() {
             return;
         }
         
-        orders.forEach(order => {
-            const statusColor = order.status === 'approved' ? 'var(--success)' : (order.status === 'rejected' ? 'var(--danger)' : 'var(--warning)');
-            const statusText = order.status.toUpperCase();
+        orders.forEach(o => {
+            let statusClass = 'warning';
+            let statusLabel = o.status;
             
-            // Timeline state
-            const step1 = 'active'; // Ordered is always done
-            const step2 = order.status !== 'pending' ? 'active' : ''; // Verified if not pending
-            const step3 = order.status === 'approved' ? 'active' : ''; // Delivered placeholder
-            
-            grid.innerHTML += `
-                <div class="glass-panel card">
-                    <div class="d-flex justify-between">
-                        <h3>${o.name}</h3>
-                        <span class="badge badge-${badgeClass.split('-')[0]}">${o.status}</span>
+            if(o.status === 'VERIFIED' || o.status === 'DELIVERED') statusClass = 'success';
+            if(o.status === 'REJECTED' || o.status === 'CANCELLED' || o.status === 'EXPIRED') statusClass = 'danger';
+            if(o.status === 'PAYMENT_UPLOADED') { statusClass = 'info'; statusLabel = 'VERIFYING'; }
+
+            // Timeline Calculation
+            const steps = [
+                { label: 'Ordered', active: true },
+                { label: 'Paid', active: ['PAYMENT_UPLOADED', 'VERIFIED', 'DELIVERED'].includes(o.status) },
+                { label: 'Secured', active: ['VERIFIED', 'DELIVERED'].includes(o.status) }
+            ];
+
+            const timelineHtml = `
+                <div class="order-timeline" style="display:flex; justify-content:space-between; margin: 1.5rem 0; position:relative;">
+                    <div style="position:absolute; top:10px; left:0; right:0; height:2px; background:rgba(255,255,255,0.1); z-index:0;"></div>
+                    <div style="position:absolute; top:10px; left:0; width:${o.status === 'VERIFIED' ? '100%' : (o.status === 'PAYMENT_UPLOADED' ? '50%' : '0%')}; height:2px; background:var(--primary); transition:width 0.5s; z-index:0;"></div>
+                    ${steps.map(s => `
+                        <div style="text-align:center; z-index:1; position:relative;">
+                            <div style="width:20px; height:20px; border-radius:50%; background:${s.active ? 'var(--primary)' : '#333'}; border:4px solid var(--bg-dark); margin:0 auto 0.5rem;"></div>
+                            <span style="font-size:0.7rem; color:${s.active ? 'var(--text-main)' : 'var(--text-muted)'}">${s.label}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            let actionHtml = '';
+            if(o.status === 'PAYMENT_PENDING' || o.status === 'REJECTED') {
+                actionHtml = `
+                    <div class="glass-panel" style="padding:1rem; margin-top:1rem; background:rgba(255,100,255,0.05);">
+                        <p style="font-size:0.8rem; margin-bottom:1rem; font-weight:600;">✨ Complete Payment to Secure Vibe</p>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+                            <div id="qr-${o.id}" style="background:white; padding:8px; border-radius:8px; width:fit-content;"></div>
+                            <div>
+                                <p style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.5rem;">UPI ID: ${o.upi_id}</p>
+                                <input type="text" id="utr-${o.id}" placeholder="12-Digit UTR ID" class="form-group" style="padding:0.5rem; width:100%; margin-bottom:0.5rem;">
+                                <input type="file" id="proof-${o.id}" accept="image/*" style="font-size:0.7rem; margin-bottom:0.5rem;">
+                                <button class="btn btn-primary btn-small" style="width:100%" onclick="submitPayment(${o.id})">Submit Payment</button>
+                            </div>
+                        </div>
                     </div>
-                    <p class="price">₹${o.price}</p>
-                    <p style="font-size: 0.8rem">Ordered: ${new Date(o.created_at).toLocaleString()}</p>
+                `;
+            }
+
+            const rejectionHtml = o.status === 'REJECTED' ? `
+                <div style="padding:0.75rem; background:rgba(255,0,0,0.1); border-left:4px solid var(--danger); border-radius:4px; margin: 1rem 0;">
+                    <p style="font-size:0.8rem; color:var(--danger); font-weight:600;">Rejection Reason:</p>
+                    <p style="font-size:0.8rem; color:var(--text-main);">${o.rejection_reason || 'Unknown issue with payment proof.'}</p>
+                </div>
+            ` : '';
+
+            grid.innerHTML += `
+                <div class="glass-panel card" style="border-top: 4px solid var(--${statusClass === 'info' ? 'accent-blue' : (statusClass === 'success' ? 'primary' : 'danger')});">
+                    <div class="d-flex justify-between" style="align-items:flex-start;">
+                        <div>
+                            <h3 style="margin-bottom:0.25rem;">${o.name}</h3>
+                            <p style="color:var(--text-muted); font-size:0.8rem;">#ORD-${o.id} • ${new Date(o.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <span class="badge" style="background:var(--${statusClass === 'info' ? 'accent-blue' : (statusClass === 'success' ? 'accent-green' : 'danger')});">${statusLabel}</span>
+                    </div>
+                    
+                    <div style="margin:1rem 0;">
+                        <span class="price" style="font-size:1.5rem;">₹${o.price}</span>
+                        ${o.utr_id ? `<p style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem;">UTR: ${o.utr_id}</p>` : ''}
+                    </div>
+
+                    ${timelineHtml}
+                    ${rejectionHtml}
                     ${actionHtml}
                 </div>
             `;
         });
         
-        // Render QRs for pending ones
-        orders.filter(o => o.status === 'PAYMENT_PENDING').forEach(o => {
-            const upiUrl = `upi://pay?pa=${o.upi_id}&pn=FestSeller&am=${o.price}`;
-            new QRCode(document.getElementById(`qr-${o.id}`), {
-                text: upiUrl,
-                width: 128,
-                height: 128,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
+        // Render QRs after appending to DOM
+        orders.forEach(o => {
+            if(o.status === 'PAYMENT_PENDING' || o.status === 'REJECTED') {
+                const upiUrl = `upi://pay?pa=${o.upi_id}&pn=FestSeller&am=${o.price}&cu=INR`;
+                new QRCode(document.getElementById(`qr-${o.id}`), {
+                    text: upiUrl,
+                    width: 80,
+                    height: 80,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.M
+                });
+            }
         });
     } catch (e) {
         console.error(e);
+        api.showToast('Failed to load orders', 'error');
     }
 }
 
-async function buyProduct(productId, name, price) {
-    if(!confirm(`Order ${name} for ₹${price}?`)) return;
-    try {
-        await api.request('/customer/order', {
-            method: 'POST',
-            headers: api.getHeaders(),
-            body: JSON.stringify({ product_id: productId })
-        });
-        alert('Order placed! Please upload the payment proof.');
-        toggleView('orders-view');
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-async function uploadProof(orderId) {
+async function submitPayment(orderId) {
+    const utrInput = document.getElementById(`utr-${orderId}`);
     const fileInput = document.getElementById(`proof-${orderId}`);
-    if(!fileInput.files[0]) return alert('Please select a file first');
     
+    if(!utrInput.value || !re.match(/^\d{12}$/, utrInput.value)) {
+        return api.showToast('Please enter a valid 12-digit UTR ID', 'error');
+    }
+    if(!fileInput.files[0]) {
+        return api.showToast('Please upload payment screenshot', 'error');
+    }
+
     const formData = new FormData();
     formData.append('order_id', orderId);
+    formData.append('utr_id', utrInput.value);
     formData.append('proof', fileInput.files[0]);
-    
+
     try {
+        api.showToast('Uploading payment proof...', 'info');
         await api.request('/customer/payment-proof', {
             method: 'POST',
             headers: api.getHeaders(true),
             body: formData
         });
-        alert('Proof uploaded successfully!');
+        api.showToast('Payment submitted! Verification in progress.', 'success');
         loadOrders();
     } catch (e) {
         console.error(e);
+        api.showToast(e.message || 'Upload failed', 'error');
     }
 }
 

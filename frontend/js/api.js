@@ -93,6 +93,40 @@ const api = {
         const colors = ['#ff3366', '#7000ff', '#00d2ff', '#00ff88', '#f59e0b', '#ec4899'];
         const charCodeSum = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
         return colors[charCodeSum % colors.length];
+    },
+    showToast: (message, type = 'info') => {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerText = message;
+        toast.style.position = 'fixed';
+        toast.style.bottom = '2rem';
+        toast.style.right = '2rem';
+        toast.style.padding = '1rem 2rem';
+        toast.style.borderRadius = '12px';
+        toast.style.background = type === 'success' ? 'var(--success)' : (type === 'error' ? 'var(--danger)' : 'var(--glass)');
+        toast.style.color = 'white';
+        toast.style.backdropFilter = 'blur(10px)';
+        toast.style.boxShadow = '0 10px 40px rgba(0,0,0,0.5)';
+        toast.style.zIndex = '10000';
+        toast.style.animation = 'slideUp 0.3s ease-out';
+        
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s';
+            setTimeout(() => toast.remove(), 500);
+        }, 4000);
+    },
+    formatTimeAgo: (timestamp) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return date.toLocaleDateString();
     }
 };
 
