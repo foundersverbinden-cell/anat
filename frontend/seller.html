@@ -16,9 +16,9 @@
     
     <div class="container">
         <!-- Add Product -->
-        <div class="glass-panel" style="margin-bottom: 3rem;">
-            <h2>Add New Product</h2>
-            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+        <div class="glass-panel" style="margin-top: 2rem;">
+            <h2 style="color: var(--secondary); margin-bottom: 1.5rem;">Add New Product</h2>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                 <div class="form-group">
                     <label>Product Name</label>
                     <input type="text" id="prod-name" placeholder="E.g. Fest T-Shirt">
@@ -33,16 +33,20 @@
                 </div>
                 <div class="form-group">
                     <label>Product Image</label>
-                    <input type="file" id="prod-image" accept="image/*" style="padding: 0;">
+                    <input type="file" id="prod-image" accept="image/*" style="padding: 0.5rem 0;">
                 </div>
             </div>
-            <button class="btn btn-primary" style="width: auto; margin-top: 1rem;" onclick="addProduct()">Add Product</button>
+            <button class="btn btn-primary mt-2" onclick="addProduct()">Add Product</button>
         </div>
 
-        <!-- Orders -->
-        <h2>Manage Orders</h2>
-        <div class="grid" id="seller-orders-grid">
-            <!-- Orders load here -->
+        <h2 class="section-title" style="margin-top: 3rem;">My Products</h2>
+        <div id="seller-products-grid" class="grid">
+            <!-- Products will be loaded here -->
+        </div>
+
+        <h2 class="section-title" style="margin-top: 3rem;">Manage Orders</h2>
+        <div id="seller-orders-grid" class="grid">
+            <p>Loading orders...</p>
         </div>
     </div>
     

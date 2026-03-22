@@ -1,5 +1,6 @@
 // Update this with your live Railway URL
 const API_BASE = 'https://anat-production.up.railway.app/api';
+const IMAGE_BASE = 'https://anat-production.up.railway.app/uploads';
 
 const api = {
     getToken: () => localStorage.getItem('token'),

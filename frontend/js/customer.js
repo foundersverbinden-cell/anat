@@ -14,7 +14,7 @@ async function loadProducts() {
         products.forEach(p => {
             grid.innerHTML += `
                 <div class="glass-panel card">
-                    <img src="http://localhost:5000/api/uploads/${p.image}" class="card-img" alt="${p.name}">
+                    <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
                     <h3>${p.name}</h3>
                     <p>Seller: ${p.seller_email}</p>
                     <p class="price">₹${p.price}</p>

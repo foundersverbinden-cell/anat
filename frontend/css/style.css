@@ -220,3 +220,31 @@ input[type="file"] {
 .d-flex { display: flex; gap: 1rem; }
 .justify-between { justify-content: space-between; }
 .price { font-size: 1.25rem; font-weight: 800; color: var(--success); margin: 0.5rem 0; }
+
+.section-title {
+    font-size: 1.75rem;
+    margin-bottom: 2rem;
+    position: relative;
+    padding-left: 1rem;
+    border-left: 4px solid var(--primary);
+    -webkit-text-fill-color: var(--text-light); /* Override gradient for titles if needed */
+    background: none;
+}
+
+.card-img {
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover .card-img {
+    transform: scale(1.05);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}

@@ -1,5 +1,47 @@
 requireAuth('seller');
 
+async function loadProducts() {
+    try {
+        const products = await api.request('/seller/products', { headers: api.getHeaders() });
+        const grid = document.getElementById('seller-products-grid');
+        grid.innerHTML = '';
+        
+        if(products.length === 0) {
+            grid.innerHTML = '<p>You haven\'t added any products yet.</p>';
+            return;
+        }
+        
+        products.forEach(p => {
+            grid.innerHTML += `
+                <div class="glass-panel card">
+                    <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
+                    <div class="d-flex justify-between" style="margin-top: 1rem;">
+                        <h3>${p.name}</h3>
+                        <p class="price">₹${p.price}</p>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-dim);">UPI: ${p.upi_id}</p>
+                    <button class="btn btn-primary btn-small mt-2" style="background: var(--danger);" onclick="deleteProduct(${p.id})">🗑️ Delete</button>
+                </div>
+            `;
+        });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function deleteProduct(productId) {
+    if(!confirm('Are you sure you want to delete this product?')) return;
+    try {
+        await api.request(`/seller/product/${productId}`, {
+            method: 'DELETE',
+            headers: api.getHeaders()
+        });
+        loadProducts(); // Reload lists
+    } catch (e) {
+        console.error(e);
+    }
+}
+
 async function loadOrders() {
     try {
         const orders = await api.request('/seller/orders', { headers: api.getHeaders() });
@@ -18,14 +60,15 @@ async function loadOrders() {
             let proofImage = '';
             
             if(o.payment_proof) {
-                proofImage = `<img src="http://localhost:5000/api/uploads/${o.payment_proof}" class="card-img" style="height: 150px; cursor: pointer; border: 1px solid var(--primary);" onclick="window.open(this.src)" title="Click to enlarge">`;
+                // FIXED: Using IMAGE_BASE for live rendering
+                proofImage = `<img src="${IMAGE_BASE}/${o.payment_proof}" class="card-img" style="height: 150px; cursor: pointer; border: 1px solid var(--primary);" onclick="window.open(this.src)" title="Click to enlarge">`;
             }
             
             if(o.status === 'PAYMENT_UPLOADED') {
                 actions = `
-                    <div class="d-flex mt-2">
-                        <button class="btn btn-primary" style="background: var(--success);" onclick="verifyPayment(${o.id}, 'approve')">Approve</button>
-                        <button class="btn btn-primary" style="background: var(--danger);" onclick="verifyPayment(${o.id}, 'reject')">Reject</button>
+                    <div class="d-flex mt-2" style="gap: 0.5rem;">
+                        <button class="btn btn-primary" style="background: var(--success); flex: 1;" onclick="verifyPayment(${o.id}, 'approve')">Approve</button>
+                        <button class="btn btn-primary" style="background: var(--danger); flex: 1;" onclick="verifyPayment(${o.id}, 'reject')">Reject</button>
                     </div>
                 `;
             } else if (o.status === 'VERIFIED') {
@@ -82,6 +125,8 @@ async function addProduct() {
         document.getElementById('prod-price').value = '';
         document.getElementById('prod-upi').value = '';
         imageInput.value = '';
+        
+        loadProducts(); // Load the new product
     } catch (e) {
         console.error(e);
     }
@@ -114,4 +159,5 @@ async function deliverOrder(orderId) {
 }
 
 // Initial load
+loadProducts();
 loadOrders();

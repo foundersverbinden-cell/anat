@@ -34,6 +34,34 @@ def add_product(current_user):
     
     return jsonify({'message': 'Product added successfully'}), 201
 
+@seller_bp.route('/products', methods=['GET'])
+@token_required(allowed_roles=['seller'])
+def get_products(current_user):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM products WHERE seller_id = ? ORDER BY created_at DESC", (current_user['id'],))
+    products = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return jsonify(products), 200
+
+@seller_bp.route('/product/<int:product_id>', methods=['DELETE'])
+@token_required(allowed_roles=['seller'])
+def delete_product(current_user, product_id):
+    conn = get_db()
+    c = conn.cursor()
+    
+    # Check ownership
+    c.execute("SELECT id FROM products WHERE id = ? AND seller_id = ?", (product_id, current_user['id']))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({'error': 'Product not found or unauthorized'}), 404
+        
+    c.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    conn.commit()
+    log_audit('PRODUCT_DELETED', current_user['id'], f"Deleted product {product_id}")
+    conn.close()
+    return jsonify({'message': 'Product deleted successfully'}), 200
+
 @seller_bp.route('/orders', methods=['GET'])
 @token_required(allowed_roles=['seller'])
 def get_orders(current_user):
