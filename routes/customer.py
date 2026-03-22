@@ -26,7 +26,7 @@ def get_products(current_user):
     conn = get_db()
     c = conn.cursor()
     c.execute('''
-        SELECT p.id, p.name, p.description, p.price, p.image, p.upi_id, u.email as seller_email 
+        SELECT p.id, p.name, p.description, p.price, p.image, p.upi_id, u.email as seller_email, u.is_verified
         FROM products p 
         JOIN users u ON p.seller_id = u.id
     ''')
@@ -200,3 +200,21 @@ def increment_view(current_user):
     conn.commit()
     conn.close()
     return jsonify({'message': 'View recorded'}), 200
+
+@customer_bp.route('/recently-purchased', methods=['GET'])
+@token_required(allowed_roles=['customer'])
+def recently_purchased(current_user):
+    conn = get_db()
+    c = conn.cursor()
+    # Get last 5 verified orders
+    c.execute('''
+        SELECT p.name, o.updated_at
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        WHERE o.status IN ('VERIFIED', 'DELIVERED')
+        ORDER BY o.updated_at DESC
+        LIMIT 5
+    ''')
+    feed = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return jsonify(feed), 200

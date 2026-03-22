@@ -76,6 +76,16 @@
         </div>
     </div>
 
+    <!-- Step-Based Checkout Modal -->
+    <div id="checkout-modal" class="modal-overlay" onclick="closeCheckoutModal(event)">
+        <div class="modal-content" style="max-width: 500px;" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeCheckoutModal()">×</button>
+            <div id="checkout-body">
+                <!-- Checkout steps injected via JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- AI Chatbot Widget -->
     <div class="chat-widget">
         <div id="chat-window" class="chat-window">

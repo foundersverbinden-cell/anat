@@ -58,36 +58,42 @@ const api = {
             }
             return data;
         } catch (error) {
-            if(!isRetry) alert(error.message);
+            if(!isRetry) api.showToast(error.message, 'error');
             throw error;
         }
     },
     // V5 Trust & Identity Utilities
-    getSellerContext: (email) => {
-        if (!email) return { name: 'Unknown Seller', avatar: '?', rating: '0.0', reviews: 0, verified: false };
+    getSellerContext: (email, isVerifiedFromDb = false) => {
+        if (!email) return { name: 'Unknown Seller', avatar: '?', verified: false };
         
         const prefix = email.split('@')[0];
         const name = prefix.charAt(0).toUpperCase() + prefix.slice(1).replace(/[._]/g, ' ');
-        
-        // Deterministic mock data based on email hash-like string
-        const charCodeSum = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const rating = (4.0 + (charCodeSum % 10) / 10).toFixed(1);
-        const reviews = 10 + (charCodeSum % 90);
-        const verified = charCodeSum % 3 === 0; // 33% chance of being verified
         const initials = prefix.substring(0, 2).toUpperCase();
         
-        return { name, initials, rating, reviews, verified };
+        return { name, initials, verified: isVerifiedFromDb };
     },
-    renderSellerBadge: (email) => {
-        const ctx = api.getSellerContext(email);
+    renderSellerBadge: (email, isVerifiedFromDb = false) => {
+        if (!email) return `<div class="d-flex" style="gap: 0.5rem; align-items: center;"><div class="avatar" style="width: 24px; height: 24px; font-size: 0.6rem; background: #333; text-align: center; border-radius: 50%; color: white;">?</div><span style="font-size: 0.85rem; color: var(--text-muted);">Unknown Curator</span></div>`;
+        const ctx = api.getSellerContext(email, isVerifiedFromDb);
+        const verifiedBadge = ctx.verified ? '<span title="Vibe Verified" style="color: var(--primary); font-size: 0.8rem; margin-top: -2px;">🛡️</span>' : '';
+        
         return `
-            <div class="seller-badge">
-                <div class="avatar" style="background: ${api.getAvatarColor(email)}">${ctx.initials}</div>
-                <span style="font-weight:600;">${ctx.name}</span>
-                ${ctx.verified ? '<span class="badge-verified" title="Verified Seller">✔️</span>' : ''}
-                <span style="color:var(--warning); margin-left: auto;">⭐ ${ctx.rating}</span>
+            <div class="seller-badge" style="display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.03); padding: 4px 10px; border-radius: 50px; border: 1px solid var(--glass-border); width: fit-content;">
+                <div class="avatar" style="background: ${api.getAvatarColor(email)}; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; color: white; font-size: 0.65rem;">${ctx.initials}</div>
+                <span style="font-weight:600; font-size: 0.85rem;">${ctx.name}</span>
+                ${verifiedBadge}
             </div>
         `;
+    },
+    renderSkeletons: (containerId, count = 4) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = Array(count).fill(0).map(() => `
+            <div class="glass-panel skeleton skeleton-card"></div>
+        `).join('');
+    },
+    renderSocialProof: (productId) => {
+        return ''; // Feature dismantled - use actual DB views directly in component instead
     },
     getAvatarColor: (email) => {
         const colors = ['#ff3366', '#7000ff', '#00d2ff', '#00ff88', '#f59e0b', '#ec4899'];
@@ -131,6 +137,12 @@ const api = {
     toggleMobileMenu: () => {
         const links = document.getElementById('nav-links');
         if (links) links.classList.toggle('active');
+    },
+    safeGet: (obj, path, fallback = '—') => {
+        try {
+            const value = path.split('.').reduce((acc, part) => acc && acc[part], obj);
+            return (value === undefined || value === null || value === '') ? fallback : value;
+        } catch (e) { return fallback; }
     }
 };
 

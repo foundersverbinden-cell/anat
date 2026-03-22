@@ -15,20 +15,21 @@ def init_db():
 
     # Migrate orders table if it exists
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders';")
-    if c.fetchone():
-        c.execute("DROP TABLE IF EXISTS orders_old;")
-        c.execute("ALTER TABLE orders RENAME TO orders_old;")
-
-    # 1. users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('customer', 'seller')),
+            is_verified INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Safely try to add column for existing users table
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0")
+    except Exception: pass
     
     # 2. products table
     c.execute('''

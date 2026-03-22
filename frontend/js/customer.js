@@ -4,8 +4,10 @@ let allProducts = [];
 
 async function loadProducts() {
     try {
+        api.renderSkeletons('products-grid', 8);
         allProducts = await api.request('/customer/products', { headers: api.getHeaders() });
         displayProducts(allProducts);
+        loadSocialProofTicker();
     } catch (e) {
         console.error(e);
     }
@@ -27,32 +29,28 @@ function displayProducts(products) {
     }
     
     products.forEach((p, index) => {
-        const sellerBadge = api.renderSellerBadge(p.seller_email);
-        const charCodeSum = p.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const stock = 2 + (charCodeSum % 8);
-        const viewing = 5 + (charCodeSum % 25);
-        const badge = index < 2 ? 'New' : (index % 3 === 0 ? 'Bestseller' : (index % 5 === 0 ? 'Trending' : ''));
+        const verifiedBadgeHtml = p.is_verified === 1 ? '<span class="badge" style="position: absolute; top: 1rem; right: 1rem; background: var(--success); z-index: 10;">Guaranteed Vibe</span>' : '';
+        const realViews = p.views || 0;
         
         grid.innerHTML += `
             <div class="glass-panel card" onclick="openModal(${p.id})">
                 <div style="position: relative;">
                     <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
-                    ${badge ? `<span class="badge" style="position: absolute; top: 1rem; right: 1rem; background: var(--primary);">${badge}</span>` : ''}
+                    ${verifiedBadgeHtml}
                     <div class="card-overlay" style="position: absolute; bottom: 1rem; left: 1rem; right: 1rem; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); padding: 0.5rem; border-radius: 8px; font-size: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <span class="pulse" style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%;"></span>
-                        ${viewing} people are viewing this vibe
+                        <span class="pulse" style="width: 8px; height: 8px; background: var(--accent-blue); border-radius: 50%;"></span>
+                        👁️ ${realViews} total views
                     </div>
                 </div>
                 
                 <h3 style="margin: 1rem 0 0.5rem 0; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.name}</h3>
                 
-                <div style="margin-bottom: 1rem;">${sellerBadge}</div>
+                <div style="margin-bottom: 1rem;">${api.renderSellerBadge(p.seller_email, p.is_verified === 1)}</div>
                 
                 <div class="d-flex justify-between" style="align-items: flex-end; margin-top: auto;">
                     <div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); text-decoration: line-through; margin-bottom: -0.25rem;">₹${(p.price * 1.2).toFixed(0)}</div>
                         <div class="price" style="font-size: 1.4rem; color: var(--text-main);">₹${p.price}</div>
-                        <div style="font-size: 0.7rem; color: var(--danger); font-weight: 700;">🔥 Only ${stock} left!</div>
                     </div>
                     <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); openModal(${p.id})">View Details</button>
                 </div>
@@ -94,37 +92,38 @@ function openModal(productId) {
 
     const modal = document.getElementById('product-modal');
     const body = document.getElementById('modal-body');
-    const ctx = api.getSellerContext(p.seller_email);
+    const ctx = api.getSellerContext(p.seller_email, p.is_verified === 1);
     
     // Find related products (same price range or just others)
     const related = allProducts.filter(x => x.id !== p.id).slice(0, 3);
     
     body.innerHTML = `
-        <div class="modal-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+        <div class="modal-grid">
             <div style="position: sticky; top: 0;">
                 <img src="${IMAGE_BASE}/${p.image}" style="width:100%; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform: perspective(1000px) rotateY(-5deg);">
             </div>
             <div>
                 <div class="d-flex" style="gap: 0.5rem; margin-bottom: 0.5rem;">
-                    <span class="badge" style="background: var(--secondary);">Vibe Verified</span>
+                    ${p.is_verified === 1 ? '<span class="badge" style="background: var(--success);">Vibe Verified</span>' : ''}
                     <span class="badge" style="background: var(--accent-blue);">Popular</span>
+                    <span class="badge" style="background: rgba(255,255,255,0.1);"><span class="pulse" style="width: 6px; height: 6px; background: var(--accent-blue); border-radius: 50%; display: inline-block; margin-right: 4px;"></span>${p.views || 0} views</span>
                 </div>
                 <h2 style="font-size: 2.5rem; margin-bottom: 0.5rem; line-height: 1.1;">${p.name}</h2>
                 <div class="price" style="font-size: 2.2rem; color: var(--primary); margin-bottom: 1.5rem;">₹${p.price}</div>
                 
                 <div class="glass-panel" style="padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
                     <p style="color:var(--text-main); font-weight: 600; margin-bottom: 0.5rem;">Description</p>
-                    <p style="color:var(--text-muted); line-height:1.6;">${p.description || "This exclusive festival vibe is handcrafted for peak performance. Limited availability."}</p>
+                    <p style="color:var(--text-muted); line-height:1.6;">${(p.description && p.description !== "undefined") ? p.description : "This exclusive festival vibe is handcrafted for peak performance. Limited availability."}</p>
                 </div>
                 
                 <div class="glass-panel" style="padding: 1rem; border-radius: 12px; margin-bottom: 2rem;">
                     <p style="color:var(--text-main); font-weight: 600; margin-bottom: 0.75rem;">Meet the Seller</p>
-                    ${api.renderSellerBadge(p.seller_email)}
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">${ctx.reviews} positive vibes delivered. Response time: < 1hr.</p>
+                    ${api.renderSellerBadge(p.seller_email, p.is_verified === 1)}
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Enterprise-level delivery. Response time: < 1hr.</p>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center;">
-                    <button class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem; width: 100%; justify-content: center;" onclick="buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Secure Checkout</button>
+                    <button class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem; width: 100%; justify-content: center;" onclick="buyProduct(${p.id}, '${p.name}', ${p.price}, '${p.upi_id}')">🛒 Secure Checkout</button>
                     <div id="quick-qr" style="background:white; padding: 4px; border-radius: 8px;"></div>
                 </div>
             </div>
@@ -145,16 +144,169 @@ function openModal(productId) {
     `;
     
     modal.classList.add('active');
+    
+    // Fix: properly encode UPI parameters
+    const encodedName = encodeURIComponent('FestMarket Curator');
+    const encodedUpiUrl = `upi://pay?pa=${p.upi_id}&pn=${encodedName}&am=${p.price}&cu=INR`;
+    
     new QRCode(document.getElementById("quick-qr"), {
-        text: `upi://pay?pa=${p.upi_id}&pn=FestMarket&am=${p.price}&cu=INR`,
+        text: encodedUpiUrl,
         width: 60,
         height: 60
     });
 }
 
-function closeModal(e) {
-    if(!e || e.target.id === 'product-modal' || e.target.className === 'modal-close') {
-        document.getElementById('product-modal').classList.remove('active');
+function closeCheckoutModal(e) {
+    if(!e || e.target.id === 'checkout-modal' || e.target.className === 'modal-close') {
+        document.getElementById('checkout-modal').classList.remove('active');
+    }
+}
+
+let activeCheckoutOrder = null;
+
+async function buyProduct(productId, name, price, upiId) {
+    try {
+        api.showToast('Initiating secure checkout...', 'info');
+        const res = await api.request('/customer/order', {
+            method: 'POST',
+            body: JSON.stringify({ product_id: productId })
+        });
+        
+        closeModal(); // close product modal
+        resumeCheckout(res.order_id, upiId, price);
+        loadOrders();
+    } catch (e) {
+        api.showToast(e.message || 'Failed to initialize checkout', 'error');
+    }
+}
+
+function resumeCheckout(orderId, upiId, price) {
+    activeCheckoutOrder = { id: orderId, upi_id: upiId, price: price };
+    renderCheckoutStep(1);
+    document.getElementById('checkout-modal').classList.add('active');
+}
+
+function copyUpi(upiId) {
+    navigator.clipboard.writeText(upiId).then(() => {
+        api.showToast('UPI ID copied to clipboard!', 'success');
+    });
+}
+
+function renderCheckoutStep(step) {
+    const body = document.getElementById('checkout-body');
+    if (!activeCheckoutOrder) return;
+    
+    const { id, upi_id, price } = activeCheckoutOrder;
+    const encodedName = encodeURIComponent('FestMarket Curator');
+    const upiUrl = `upi://pay?pa=${upi_id}&pn=${encodedName}&am=${price}&cu=INR`;
+
+    if (step === 1) {
+        body.innerHTML = `
+            <div style="text-align: center; animation: scaleUp 0.3s ease-out;">
+                <h2 style="margin-bottom: 0.5rem;">Step 1: Secure Payment</h2>
+                <p style="color:var(--text-muted); margin-bottom: 2rem;">Scan or tap to pay ₹${price}</p>
+                
+                <div id="checkout-qr" style="background:white; padding:16px; border-radius:16px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 1.5rem;"></div>
+                
+                <div class="glass-panel" style="padding: 1rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+                    <code style="color: var(--primary); font-size: 1.1rem;">${upi_id}</code>
+                    <button class="btn btn-outline btn-small" onclick="copyUpi('${upi_id}')">Copy</button>
+                </div>
+                
+                <div class="d-flex" style="gap: 1rem;">
+                    <a href="${upiUrl}" class="btn btn-outline" style="flex: 1; justify-content: center; display: flex; text-decoration: none;">Pay via UPI App</a>
+                    <button class="btn btn-primary" style="flex: 1; justify-content: center;" onclick="renderCheckoutStep(2)">I have paid ➔</button>
+                </div>
+            </div>
+        `;
+        
+        setTimeout(() => {
+            new QRCode(document.getElementById("checkout-qr"), {
+                text: upiUrl,
+                width: 180,
+                height: 180,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
+            });
+        }, 50);
+    } else if (step === 2) {
+        body.innerHTML = `
+            <div style="animation: scaleUp 0.3s ease-out;">
+                <button class="btn btn-outline btn-small" style="margin-bottom: 1rem; border: none; padding: 0;" onclick="renderCheckoutStep(1)">← Back to Payment</button>
+                <h2 style="margin-bottom: 0.5rem;">Step 2: Upload Proof</h2>
+                <p style="color:var(--text-muted); margin-bottom: 1.5rem;">Provide your UTR and screenshot to verify the order #ORD-${id}.</p>
+                
+                <input type="text" id="checkout-utr" placeholder="12-Digit UTR ID" class="form-group" style="padding:1rem; width:100%; margin-bottom:1.5rem; font-size: 1.1rem; letter-spacing: 2px;">
+                
+                <label class="file-upload-wrapper" for="checkout-proof" style="display: block; margin-bottom: 1.5rem;">
+                    <div id="checkout-upload-label">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📸</div>
+                        <div style="font-size: 1rem; font-weight: 600;">Tap to Upload Screenshot</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">PNG, JPG up to 5MB</div>
+                    </div>
+                    <img id="checkout-preview" class="file-preview-img" style="margin: 0 auto;">
+                    <input type="file" id="checkout-proof" accept="image/*" class="hidden" onchange="handleCheckoutPreview(this)">
+                </label>
+                
+                <button class="btn btn-primary" style="width:100%; justify-content: center; font-size: 1.1rem; padding: 1rem;" onclick="submitCheckoutPayment(${id})">Submit for Verification</button>
+            </div>
+        `;
+    }
+}
+
+function handleCheckoutPreview(input) {
+    const file = input.files[0];
+    const preview = document.getElementById('checkout-preview');
+    const label = document.getElementById('checkout-upload-label');
+    
+    if (file && preview && label) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            label.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+async function submitCheckoutPayment(orderId) {
+    const utrInput = document.getElementById('checkout-utr');
+    const fileInput = document.getElementById('checkout-proof');
+    
+    if(!utrInput.value || !/^\d{12}$/.test(utrInput.value)) {
+        return api.showToast('Please enter a valid 12-digit UTR ID', 'error');
+    }
+    if(!fileInput || !fileInput.files[0]) {
+        return api.showToast('Please upload payment screenshot', 'error');
+    }
+
+    const formData = new FormData();
+    formData.append('order_id', orderId);
+    formData.append('utr_id', utrInput.value);
+    formData.append('proof', fileInput.files[0]);
+
+    try {
+        api.showToast('Uploading payment proof...', 'info');
+        await api.request('/customer/payment-proof', {
+            method: 'POST',
+            headers: api.getHeaders(true),
+            body: formData
+        });
+        
+        document.getElementById('checkout-body').innerHTML = `
+            <div style="text-align: center; padding: 2rem; animation: scaleUp 0.5s ease-out;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🚀</div>
+                <h2 style="color: var(--primary); margin-bottom: 0.5rem;">Payment Received!</h2>
+                <p style="color: var(--text-muted); font-size: 1rem; margin-bottom: 2rem;">Our curators are verifying your vibe. Hold tight.</p>
+                <button class="btn btn-outline" style="width: 100%; justify-content: center;" onclick="closeCheckoutModal()">View Timeline</button>
+            </div>
+        `;
+        
+        setTimeout(loadOrders, 1000);
+    } catch (e) {
+        api.showToast(e.message || 'Upload failed', 'error');
     }
 }
 
@@ -211,8 +363,9 @@ function appendMessage(sender, text, products = []) {
 }
 async function loadOrders() {
     try {
-        const orders = await api.request('/customer/orders', { headers: api.getHeaders() });
         const grid = document.getElementById('orders-grid');
+        api.renderSkeletons('orders-grid', 3);
+        const orders = await api.request('/customer/orders', { headers: api.getHeaders() });
         grid.innerHTML = '';
         
         if(orders.length === 0) {
@@ -255,20 +408,11 @@ async function loadOrders() {
                 </div>
             `;
 
-            let actionHtml = '';
             if(o.status === 'PAYMENT_PENDING' || o.status === 'REJECTED') {
                 actionHtml = `
-                    <div class="glass-panel" style="padding:1rem; margin-top:1rem; background:rgba(255,100,255,0.05);">
-                        <p style="font-size:0.8rem; margin-bottom:1rem; font-weight:600;">✨ Complete Payment to Secure Vibe</p>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
-                            <div id="qr-${o.id}" style="background:white; padding:8px; border-radius:8px; width:fit-content;"></div>
-                            <div>
-                                <p style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.5rem;">UPI ID: ${o.upi_id}</p>
-                                <input type="text" id="utr-${o.id}" placeholder="12-Digit UTR ID" class="form-group" style="padding:0.5rem; width:100%; margin-bottom:0.5rem;">
-                                <input type="file" id="proof-${o.id}" accept="image/*" style="font-size:0.7rem; margin-bottom:0.5rem;">
-                                <button class="btn btn-primary btn-small" style="width:100%" onclick="submitPayment(${o.id})">Submit Payment</button>
-                            </div>
-                        </div>
+                    <div class="glass-panel" style="padding:1.5rem; margin-top:1rem; border: 1px dashed var(--primary); text-align: center;">
+                        <p style="font-size:0.9rem; margin-bottom:1rem; font-weight:600; color: var(--primary);">✨ Complete Payment to Secure Vibe</p>
+                        <button class="btn btn-primary" style="width:100%; justify-content: center;" onclick="resumeCheckout(${o.id}, '${o.upi_id}', ${o.price})">Resume Checkout Process</button>
                     </div>
                 `;
             }
@@ -302,77 +446,50 @@ async function loadOrders() {
             `;
         });
         
-        // Render QRs after appending to DOM
-        orders.forEach(o => {
-            if(o.status === 'PAYMENT_PENDING' || o.status === 'REJECTED') {
-                const upiUrl = `upi://pay?pa=${o.upi_id}&pn=FestSeller&am=${o.price}&cu=INR`;
-                new QRCode(document.getElementById(`qr-${o.id}`), {
-                    text: upiUrl,
-                    width: 80,
-                    height: 80,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.M
-                });
-            }
-        });
+        // Render QRs after appending to DOM - Removed since QR is now in modal
     } catch (e) {
         console.error(e);
         api.showToast('Failed to load orders', 'error');
     }
 }
 
-async function submitPayment(orderId) {
-    const utrInput = document.getElementById(`utr-${orderId}`);
-    const fileInput = document.getElementById(`proof-${orderId}`);
-    
-    // Fix: regex.test() instead of re.match()
-    if(!utrInput.value || !/^\d{12}$/.test(utrInput.value)) {
-        return api.showToast('Please enter a valid 12-digit UTR ID', 'error');
-    }
-    if(!fileInput.files[0]) {
-        return api.showToast('Please upload payment screenshot', 'error');
-    }
-
-    const formData = new FormData();
-    formData.append('order_id', orderId);
-    formData.append('utr_id', utrInput.value);
-    formData.append('proof', fileInput.files[0]);
-
+async function loadSocialProofTicker() {
     try {
-        api.showToast('Uploading payment proof...', 'info');
-        await api.request('/customer/payment-proof', {
-            method: 'POST',
-            headers: api.getHeaders(true),
-            body: formData
-        });
+        const feed = await api.request('/customer/recently-purchased', { headers: api.getHeaders() });
+        if (feed.length === 0) return;
         
-        // Refined Success State
-        api.showToast('✨ Payment submitted! Our team is verifying your vibe.', 'success');
-        
-        // Confirmed Success UI
-        const card = utrInput.closest('.card');
-        if(card) {
-            card.innerHTML = `
-                <div style="text-align: center; padding: 2rem; animation: scaleUp 0.5s ease-out;">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">🚀</div>
-                    <h3 style="color: var(--primary);">Payment Received!</h3>
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">Check your timeline for verification updates.</p>
-                </div>
-            `;
+        let ticker = document.getElementById('social-ticker');
+        if (!ticker) {
+            ticker = document.createElement('div');
+            ticker.id = 'social-ticker';
+            ticker.style.cssText = 'position:fixed; bottom: 2rem; left: 2rem; z-index: 1000; display: flex; flex-direction: column; gap: 0.5rem;';
+            document.body.appendChild(ticker);
         }
         
-        setTimeout(loadOrders, 2000);
-    } catch (e) {
-        console.error(e);
-        api.showToast(e.message || 'Upload failed', 'error');
-    }
+        const item = feed[Math.floor(Math.random() * feed.length)];
+        const el = document.createElement('div');
+        el.className = 'glass-panel d-flex align-center';
+        el.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.75rem; animation: slideUp 0.5s ease-out; border-radius: 50px; background: rgba(0,0,0,0.8);';
+        el.innerHTML = `
+            <span style="color:var(--accent-green);">🛒</span>
+            <span>Someone just secured <b>${item.name}</b></span>
+        `;
+        ticker.appendChild(el);
+        setTimeout(() => {
+            el.style.opacity = '0';
+            setTimeout(() => el.remove(), 500);
+        }, 5000);
+    } catch (e) { console.error(e); }
 }
+
+// submitPayment is now submitCheckoutPayment, removed old submitPayment
 
 function toggleView(viewId) {
     document.getElementById('products-view').classList.add('hidden');
     document.getElementById('orders-view').classList.add('hidden');
-    document.getElementById(viewId).classList.remove('hidden');
+    const targetView = document.getElementById(viewId);
+    targetView.classList.remove('hidden');
+    targetView.style.animation = 'slideUp 0.4s ease-out';
     
     if(viewId === 'products-view') loadProducts();
     if(viewId === 'orders-view') loadOrders();

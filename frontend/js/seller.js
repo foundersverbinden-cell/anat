@@ -45,6 +45,9 @@ function animateCounter(id, target) {
 // --- Dashboard Logic ---
 async function fetchDashboard(silent = false) {
     try {
+        if (!silent) {
+            api.renderSkeletons('seller-products-grid', 4);
+        }
         const data = await api.request('/seller/dashboard', { headers: api.getHeaders() });
         
         // Update counters with animation if changed
@@ -52,8 +55,13 @@ async function fetchDashboard(silent = false) {
         if (data.orders_count !== dashboardState.orders_count) animateCounter('stat-orders', data.orders_count);
         if (data.views !== dashboardState.views) animateCounter('stat-views', data.views);
 
-        dashboardState = data;
-        renderDashboard();
+        // Intelligent Polling - Only re-render if state changed
+        const newDashboardHash = JSON.stringify(data);
+        if (window.lastDashboardHash !== newDashboardHash) {
+            dashboardState = data;
+            window.lastDashboardHash = newDashboardHash;
+            renderDashboard();
+        }
     } catch (e) {
         console.error('Polling error:', e);
     }
@@ -100,7 +108,8 @@ function renderOrders() {
         if (o.status === 'REJECTED' || o.status === 'CANCELLED' || o.status === 'EXPIRED') statusColor = 'var(--danger)';
         if (o.status === 'PAYMENT_UPLOADED' || o.status === 'NEEDS_ATTENTION') statusColor = 'var(--accent-blue)';
 
-        const buyerName = o.customer_email.split('@')[0];
+        const buyerEmailStr = o.customer_email || 'unknown@festmarket.com';
+        const buyerName = buyerEmailStr.split('@')[0];
         const timeAgo = o.updated_at ? api.formatTimeAgo(o.updated_at) : 'Just now';
 
         return `
@@ -109,6 +118,7 @@ function renderOrders() {
                     <div class="d-flex" style="gap: 1.25rem; align-items: center;">
                         <div style="background: white; padding: 4px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                             <img src="${IMAGE_BASE}/${o.payment_proof || 'placeholder.png'}" 
+                                 onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'50\\' height=\\'50\\'><rect width=\\'50\\' height=\\'50\\' fill=\\'%23333\\'/><text x=\\'25\\' y=\\'25\\' font-family=\\'Arial\\' font-size=\\'10\\' fill=\\'%23fff\\' text-anchor=\\'middle\\' dy=\\'.3em\\'>No Image</text></svg>'"
                                  style="width: 50px; height: 50px; border-radius: 4px; object-fit: cover; cursor: zoom-in;" 
                                  onclick="window.open('${IMAGE_BASE}/${o.payment_proof}', '_blank')"
                                  title="Click to zoom proof">
@@ -145,8 +155,9 @@ function renderOrders() {
 async function handleOrderAction(orderId, action) {
     let reason = '';
     if (action === 'reject') {
-        reason = prompt("Enter rejection reason (e.g. Amount mismatch, Invalid UTR):");
-        if (reason === null) return; // Cancelled
+        const customReason = await showRejectionModal();
+        if (!customReason) return;
+        reason = customReason;
     }
 
     const orderIndex = dashboardState.orders.findIndex(o => o.id === orderId);
@@ -167,13 +178,61 @@ async function handleOrderAction(orderId, action) {
             headers: api.getHeaders(),
             body: JSON.stringify({ order_id: orderId, action, reason })
         });
-        api.showToast(`Order ${action}ed successfuly`, 'success');
+        api.showToast(`Order ${action}ed successfully`, 'success');
         fetchDashboard(true);
     } catch (e) {
         api.showToast(e.message || 'Action failed', 'error');
         dashboardState.orders[orderIndex] = originalState;
         renderDashboard();
     }
+}
+
+function showRejectionModal() {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `
+            <div class="glass-panel modal-content" style="max-width: 400px; text-align: center;">
+                <h3 style="margin-bottom: 1rem; color: var(--danger);">🚨 Reject Vibe Payment</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">Specify the reason for rejection to help the buyer correct the transaction.</p>
+                <div class="form-group">
+                    <select id="reject-reason-select" style="margin-bottom: 1rem;">
+                        <option value="Amount mismatch">Amount mismatch</option>
+                        <option value="Invalid UTR ID">Invalid UTR ID</option>
+                        <option value="Screenshot unclear">Screenshot unclear</option>
+                        <option value="Duplicate payment proof">Duplicate payment proof</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <textarea id="reject-reason-text" placeholder="Additional details..." rows="3" class="hidden" style="margin-top: 1rem;"></textarea>
+                </div>
+                <div class="d-flex" style="gap: 1rem; margin-top: 1.5rem;">
+                    <button class="btn btn-outline" style="flex: 1;" id="reject-cancel">Cancel</button>
+                    <button class="btn btn-primary" style="flex: 1; background: var(--danger);" id="reject-confirm">Confirm Rejection</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const select = modal.querySelector('#reject-reason-select');
+        const text = modal.querySelector('#reject-reason-text');
+        
+        select.onchange = (e) => {
+            if (e.target.value === 'Other') text.classList.remove('hidden');
+            else text.classList.add('hidden');
+        };
+
+        modal.querySelector('#reject-cancel').onclick = () => {
+            modal.remove();
+            resolve(null);
+        };
+
+        modal.querySelector('#reject-confirm').onclick = () => {
+            const finalReason = select.value === 'Other' ? text.value : select.value;
+            if (!finalReason) return api.showToast('Please provide a reason', 'error');
+            modal.remove();
+            resolve(finalReason);
+        };
+    });
 }
 
 async function addProduct() {
