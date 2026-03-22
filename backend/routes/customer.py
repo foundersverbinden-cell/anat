@@ -1,0 +1,131 @@
+from flask import Blueprint, request, current_app, jsonify
+from models.db import get_db, log_audit
+from utils.auth import token_required
+from utils.upload import save_upload
+import datetime
+import time
+
+customer_bp = Blueprint('customer', __name__, url_prefix='/customer')
+
+USER_ORDER_LIMITS = {}
+def check_order_rate(user_id):
+    now = time.time()
+    if user_id not in USER_ORDER_LIMITS:
+        USER_ORDER_LIMITS[user_id] = {"count": 1, "window": now}
+        return True
+    if now - USER_ORDER_LIMITS[user_id]["window"] > 60:
+        USER_ORDER_LIMITS[user_id] = {"count": 1, "window": now}
+        return True
+    USER_ORDER_LIMITS[user_id]["count"] += 1
+    return USER_ORDER_LIMITS[user_id]["count"] <= 5
+
+@customer_bp.route('/products', methods=['GET'])
+@token_required(allowed_roles=['customer'])
+def get_products(current_user):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''
+        SELECT p.id, p.name, p.price, p.image, p.upi_id, u.email as seller_email 
+        FROM products p 
+        JOIN users u ON p.seller_id = u.id
+    ''')
+    products = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return jsonify(products), 200
+
+@customer_bp.route('/order', methods=['POST'])
+@token_required(allowed_roles=['customer'])
+def create_order(current_user):
+    if not check_order_rate(current_user['id']):
+        log_audit('RATE_LIMIT', current_user['id'], "Order creation limit exceeded", request.remote_addr)
+        return jsonify({'error': 'Order limit exceeded. Max 5 per minute.'}), 429
+
+    data = request.json
+    product_id = data.get('product_id')
+    
+    if not product_id:
+        return jsonify({'error': 'Product ID required'}), 400
+        
+    conn = get_db()
+    c = conn.cursor()
+    
+    c.execute("SELECT id FROM products WHERE id = ?", (product_id,))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({'error': 'Product not found'}), 404
+
+    c.execute(
+        "INSERT INTO orders (product_id, customer_id, status) VALUES (?, ?, 'PAYMENT_PENDING')",
+        (product_id, current_user['id'])
+    )
+    order_id = c.lastrowid
+    conn.commit()
+    log_audit('ORDER_CREATED', current_user['id'], f"Created order {order_id} for product {product_id}", request.remote_addr)
+    conn.close()
+    
+    return jsonify({'message': 'Order created, pending payment', 'order_id': order_id}), 201
+
+@customer_bp.route('/payment-proof', methods=['POST'])
+@token_required(allowed_roles=['customer'])
+def upload_proof(current_user):
+    order_id = request.form.get('order_id')
+    if 'proof' not in request.files or not order_id:
+        return jsonify({'error': 'Missing file or order ID'}), 400
+        
+    file = request.files['proof']
+    filename = save_upload(file, current_app.config['UPLOAD_FOLDER'])
+    if not filename:
+        return jsonify({'error': 'Invalid file. Must be image under 2MB'}), 400
+        
+    conn = get_db()
+    c = conn.cursor()
+    
+    c.execute("SELECT status FROM orders WHERE id = ? AND customer_id = ?", (order_id, current_user['id']))
+    order = c.fetchone()
+    
+    if not order:
+        conn.close()
+        return jsonify({'error': 'Order not found or unauthorized'}), 404
+        
+    if order['status'] != 'PAYMENT_PENDING':
+        conn.close()
+        return jsonify({'error': 'Invalid state transition'}), 400
+
+    c.execute(
+        "UPDATE orders SET status = 'PAYMENT_UPLOADED', payment_proof = ? WHERE id = ?",
+        (filename, order_id)
+    )
+    conn.commit()
+    log_audit('PAYMENT_UPLOADED', current_user['id'], f"Uploaded proof for order {order_id}", request.remote_addr)
+    conn.close()
+    
+    return jsonify({'message': 'Payment proof uploaded successfully', 'proof_image': filename}), 200
+
+@customer_bp.route('/orders', methods=['GET'])
+@token_required(allowed_roles=['customer'])
+def get_orders(current_user):
+    conn = get_db()
+    c = conn.cursor()
+    
+    # Run 15m timeout check
+    c.execute("SELECT id, status, created_at FROM orders WHERE customer_id = ?", (current_user['id'],))
+    db_orders = c.fetchall()
+    now = datetime.datetime.utcnow()
+    for o in db_orders:
+        if o['status'] == 'PAYMENT_PENDING':
+            order_time = datetime.datetime.strptime(o['created_at'], '%Y-%m-%d %H:%M:%S')
+            if (now - order_time).total_seconds() > 15 * 60:
+                c.execute("UPDATE orders SET status = 'CANCELLED' WHERE id = ?", (o['id'],))
+                log_audit('ORDER_TIMEOUT', current_user['id'], f"Order {o['id']} cancelled due to timeout")
+    conn.commit()
+
+    c.execute('''
+        SELECT o.id, o.status, p.name, p.price, p.upi_id, o.created_at
+        FROM orders o
+        JOIN products p ON o.product_id = p.id
+        WHERE o.customer_id = ?
+        ORDER BY o.created_at DESC
+    ''', (current_user['id'],))
+    orders = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return jsonify(orders), 200
