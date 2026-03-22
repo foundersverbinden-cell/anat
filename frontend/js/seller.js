@@ -98,6 +98,7 @@ async function loadOrders() {
 
 async function addProduct() {
     const name = document.getElementById('prod-name').value;
+    const desc = document.getElementById('prod-desc').value;
     const price = document.getElementById('prod-price').value;
     const upi_id = document.getElementById('prod-upi').value;
     const imageInput = document.getElementById('prod-image');
@@ -108,6 +109,7 @@ async function addProduct() {
     
     const formData = new FormData();
     formData.append('name', name);
+    formData.append('description', desc);
     formData.append('price', price);
     formData.append('upi_id', upi_id);
     formData.append('image', imageInput.files[0]);
@@ -122,6 +124,7 @@ async function addProduct() {
         
         // Reset form
         document.getElementById('prod-name').value = '';
+        document.getElementById('prod-desc').value = '';
         document.getElementById('prod-price').value = '';
         document.getElementById('prod-upi').value = '';
         imageInput.value = '';

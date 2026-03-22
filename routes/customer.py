@@ -4,6 +4,7 @@ from utils.auth import token_required
 from utils.upload import save_upload
 import datetime
 import time
+import re
 
 customer_bp = Blueprint('customer', __name__, url_prefix='/customer')
 
@@ -25,13 +26,57 @@ def get_products(current_user):
     conn = get_db()
     c = conn.cursor()
     c.execute('''
-        SELECT p.id, p.name, p.price, p.image, p.upi_id, u.email as seller_email 
+        SELECT p.id, p.name, p.description, p.price, p.image, p.upi_id, u.email as seller_email 
         FROM products p 
         JOIN users u ON p.seller_id = u.id
     ''')
     products = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(products), 200
+
+@customer_bp.route('/chat', methods=['POST'])
+@token_required(allowed_roles=['customer'])
+def ai_chat(current_user):
+    data = request.json
+    message = data.get('message', '').lower()
+    
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''
+        SELECT p.id, p.name, p.description, p.price, p.image, u.email as seller_email 
+        FROM products p 
+        JOIN users u ON p.seller_id = u.id
+    ''')
+    products = [dict(row) for row in c.fetchall()]
+    conn.close()
+    
+    # Simple NLP Keyword Matching
+    words = re.findall(r'\w+', message)
+    stop_words = {'i', 'want', 'to', 'eat', 'some', 'looking', 'for', 'a', 'an', 'the', 'is', 'are', 'show', 'me'}
+    keywords = [w for w in words if w not in stop_words]
+    
+    matches = []
+    for p in products:
+        score = 0
+        # search in name and description
+        text_to_search = f"{p['name']} {p['description']}".lower()
+        for kw in keywords:
+            if kw in text_to_search:
+                score += 1
+        if score > 0:
+            matches.append((score, p))
+            
+    matches.sort(key=lambda x: x[0], reverse=True)
+    
+    if not matches:
+        response_text = "I couldn't find exactly what you're looking for, but check out our catalog for other amazing vibes!"
+        return jsonify({'response': response_text, 'products': []}), 200
+        
+    top_matches = [m[1] for m in matches[:3]]
+    product_names = ", ".join([f"{p['name']} (₹{p['price']})" for p in top_matches])
+    response_text = f"Based on your request, I found these great options: {product_names}. Take a look below!"
+    
+    return jsonify({'response': response_text, 'products': top_matches}), 200
 
 @customer_bp.route('/order', methods=['POST'])
 @token_required(allowed_roles=['customer'])

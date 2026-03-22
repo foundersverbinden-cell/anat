@@ -36,6 +36,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             seller_id INTEGER NOT NULL,
             name TEXT NOT NULL,
+            description TEXT DEFAULT '',
             price REAL NOT NULL,
             image TEXT NOT NULL,
             upi_id TEXT NOT NULL,
@@ -44,6 +45,12 @@ def init_db():
         )
     ''')
     
+    # Safely try to add description column for existing databases
+    try:
+        c.execute("ALTER TABLE products ADD COLUMN description TEXT DEFAULT ''")
+    except Exception:
+        pass # Column already exists
+
     # 3. orders table with NEW schema
     c.execute('''
         CREATE TABLE IF NOT EXISTS orders (

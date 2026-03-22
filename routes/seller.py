@@ -10,6 +10,7 @@ seller_bp = Blueprint('seller', __name__, url_prefix='/seller')
 @token_required(allowed_roles=['seller'])
 def add_product(current_user):
     name = request.form.get('name')
+    description = request.form.get('description', '')
     price = request.form.get('price')
     upi_id = request.form.get('upi_id')
     
@@ -24,8 +25,8 @@ def add_product(current_user):
     conn = get_db()
     c = conn.cursor()
     c.execute(
-        "INSERT INTO products (seller_id, name, price, image, upi_id) VALUES (?, ?, ?, ?, ?)",
-        (current_user['id'], name, float(price), filename, upi_id)
+        "INSERT INTO products (seller_id, name, description, price, image, upi_id) VALUES (?, ?, ?, ?, ?, ?)",
+        (current_user['id'], name, description, float(price), filename, upi_id)
     )
     product_id = c.lastrowid
     conn.commit()

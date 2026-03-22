@@ -44,6 +44,38 @@
         </div>
     </div>
     
+    <!-- Product Detail Modal -->
+    <div id="product-modal" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div id="modal-body">
+                <!-- Content injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Chatbot Widget -->
+    <div class="chat-widget">
+        <div id="chat-window" class="chat-window">
+            <div class="chat-header">
+                <h3>Vibe Assistant ✨</h3>
+                <button onclick="toggleChat()" style="background:none; border:none; color:white; cursor:pointer;">&times;</button>
+            </div>
+            <div id="chat-body" class="chat-body">
+                <div class="chat-bubble bubble-ai">
+                    Hey! I'm your Vibe Assistant. Looking for something specific? Spicy food? Healthy snacks? Just ask!
+                </div>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                <button class="btn btn-primary btn-small" onclick="sendChatMessage()" style="width: auto;">Send</button>
+            </div>
+        </div>
+        <div class="chat-btn" onclick="toggleChat()">
+            💬
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/customer.js"></script>

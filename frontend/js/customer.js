@@ -22,24 +22,98 @@ function displayProducts(products) {
     
     products.forEach(p => {
         grid.innerHTML += `
-            <div class="glass-panel card">
+            <div class="glass-panel card" onclick="openModal(${p.id})">
                 <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
                 <h3>${p.name}</h3>
                 <p style="margin-bottom: 0.5rem;">Seller: ${p.seller_email}</p>
-                <p class="price">₹${p.price}</p>
-                <button class="btn btn-primary" onclick="buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Buy Now</button>
+                <div class="d-flex justify-between" style="align-items: center;">
+                    <p class="price" style="margin:0;">₹${p.price}</p>
+                    <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Buy</button>
+                </div>
             </div>
         `;
     });
 }
 
-function filterProducts() {
-    const query = document.getElementById('product-search').value.toLowerCase();
-    const filtered = allProducts.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.seller_email.toLowerCase().includes(query)
-    );
-    displayProducts(filtered);
+function openModal(productId) {
+    const p = allProducts.find(x => x.id === productId);
+    if(!p) return;
+
+    const modal = document.getElementById('product-modal');
+    const body = document.getElementById('modal-body');
+    
+    body.innerHTML = `
+        <div class="modal-grid">
+            <img src="${IMAGE_BASE}/${p.image}" style="width:100%; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+            <div>
+                <h2 style="margin-top:0;">${p.name}</h2>
+                <p class="price" style="font-size:2rem;">₹${p.price}</p>
+                <p style="color:var(--text-light); margin-bottom:2rem; line-height:1.6;">${p.description || 'No description provided for this vibe yet.'}</p>
+                <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:1.5rem;">Seller: ${p.seller_email}</p>
+                <button class="btn btn-primary" onclick="buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Checkout Now</button>
+            </div>
+        </div>
+    `;
+    
+    modal.classList.add('active');
+}
+
+function closeModal(e) {
+    if(!e || e.target.id === 'product-modal' || e.target.className === 'modal-close') {
+        document.getElementById('product-modal').classList.remove('active');
+    }
+}
+
+// Chatbot Logic
+function toggleChat() {
+    document.getElementById('chat-window').classList.toggle('active');
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if(!text) return;
+
+    appendMessage('user', text);
+    input.value = '';
+
+    try {
+        const data = await api.request('/customer/chat', {
+            method: 'POST',
+            headers: api.getHeaders(),
+            body: JSON.stringify({ message: text })
+        });
+
+        appendMessage('ai', data.response, data.products);
+    } catch (e) {
+        console.error(e);
+        appendMessage('ai', "Sorry, I'm having trouble connecting to the Vibe engine. Try again?");
+    }
+}
+
+function appendMessage(sender, text, products = []) {
+    const body = document.getElementById('chat-body');
+    const bubble = document.createElement('div');
+    bubble.className = `chat-bubble bubble-${sender}`;
+    bubble.innerText = text;
+    body.appendChild(bubble);
+
+    if(products && products.length > 0) {
+        const miniGrid = document.createElement('div');
+        miniGrid.className = 'chat-products-mini';
+        products.forEach(p => {
+            miniGrid.innerHTML += `
+                <div class="mini-card" onclick="openModal(${p.id})">
+                    <img src="${IMAGE_BASE}/${p.image}">
+                    <div style="margin-top:0.25rem; font-weight:600;">${p.name}</div>
+                    <div style="color:var(--success);">₹${p.price}</div>
+                </div>
+            `;
+        });
+        body.appendChild(miniGrid);
+    }
+
+    body.scrollTop = body.scrollHeight;
 }
 
 async function loadOrders() {
