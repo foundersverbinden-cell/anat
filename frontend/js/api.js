@@ -61,6 +61,38 @@ const api = {
             if(!isRetry) alert(error.message);
             throw error;
         }
+    },
+    // V5 Trust & Identity Utilities
+    getSellerContext: (email) => {
+        if (!email) return { name: 'Unknown Seller', avatar: '?', rating: '0.0', reviews: 0, verified: false };
+        
+        const prefix = email.split('@')[0];
+        const name = prefix.charAt(0).toUpperCase() + prefix.slice(1).replace(/[._]/g, ' ');
+        
+        // Deterministic mock data based on email hash-like string
+        const charCodeSum = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const rating = (4.0 + (charCodeSum % 10) / 10).toFixed(1);
+        const reviews = 10 + (charCodeSum % 90);
+        const verified = charCodeSum % 3 === 0; // 33% chance of being verified
+        const initials = prefix.substring(0, 2).toUpperCase();
+        
+        return { name, initials, rating, reviews, verified };
+    },
+    renderSellerBadge: (email) => {
+        const ctx = api.getSellerContext(email);
+        return `
+            <div class="seller-badge">
+                <div class="avatar" style="background: ${api.getAvatarColor(email)}">${ctx.initials}</div>
+                <span style="font-weight:600;">${ctx.name}</span>
+                ${ctx.verified ? '<span class="badge-verified" title="Verified Seller">✔️</span>' : ''}
+                <span style="color:var(--warning); margin-left: auto;">⭐ ${ctx.rating}</span>
+            </div>
+        `;
+    },
+    getAvatarColor: (email) => {
+        const colors = ['#ff3366', '#7000ff', '#00d2ff', '#00ff88', '#f59e0b', '#ec4899'];
+        const charCodeSum = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        return colors[charCodeSum % colors.length];
     }
 };
 

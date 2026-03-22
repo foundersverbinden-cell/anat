@@ -7,22 +7,43 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <nav class="navbar">
-        <a href="#" class="nav-brand">FestMarket 🎪</a>
-        <div>
-            <button class="btn btn-outline btn-small" onclick="api.logout()">Logout</button>
+    <nav class="navbar glass-panel" style="border-radius: 0; border:none; border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; z-index: 100;">
+        <div class="container d-flex justify-between" style="align-items: center; padding: 0.5rem 2rem; width: 100%; max-width: 1400px; margin:0 auto;">
+            <a href="customer.html" class="nav-brand" style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.8rem;">🎪</span>
+                <span class="neon-text-primary">FestMarket</span>
+            </a>
+            
+            <div class="nav-links d-flex" style="gap: 1.5rem; align-items: center;">
+                <a href="#" onclick="toggleView('products-view')" class="nav-link">Shop</a>
+                <a href="#" onclick="toggleView('orders-view')" class="nav-link">My Orders</a>
+                <div class="v-separator" style="width: 1px; height: 20px; background: var(--glass-border);"></div>
+                <button class="btn btn-outline btn-small" onclick="api.logout()">Logout</button>
+            </div>
         </div>
     </nav>
     
     <div class="container">
         <!-- Products View -->
         <div id="products-view">
-            <div class="glass-panel" style="margin-bottom: 2rem;">
-                <div class="d-flex justify-between" style="align-items: center; flex-wrap: wrap;">
-                    <h2 class="section-title" style="margin-bottom: 0;">Browse Vibe Catalog</h2>
-                    <div style="display: flex; gap: 1rem; align-items: center; flex: 1; min-width: 300px; justify-content: flex-end;">
-                        <input type="text" id="product-search" placeholder="🔍 Search products..." oninput="filterProducts()" style="max-width: 300px;">
-                        <button class="btn btn-primary btn-small" onclick="toggleView('orders-view')" style="width: auto;">📋 My Orders</button>
+            <div class="glass-panel" style="margin-bottom: 2rem; padding: 1.5rem;">
+                <div class="d-flex justify-between" style="align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+                    <div>
+                        <h2 class="section-title" style="margin-bottom: 0.25rem;">Explore the Catalog</h2>
+                        <p style="color:var(--text-muted); font-size: 0.9rem;">Find the perfect vibe for your next festival.</p>
+                    </div>
+                    
+                    <div class="d-flex" style="gap: 1rem; align-items: center; flex: 1; min-width: 300px; justify-content: flex-end;">
+                        <div style="position: relative; flex: 1; max-width: 400px;">
+                            <span style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); opacity: 0.5;">🔍</span>
+                            <input type="text" id="product-search" placeholder="Search by product or seller..." oninput="filterProducts()" style="width: 100%; padding-left: 2.8rem; border-radius: 50px; background: rgba(0,0,0,0.2);">
+                        </div>
+                        <select id="price-filter" onchange="filterProducts()" style="padding: 0.75rem 1rem; border-radius: 50px; background: rgba(0,0,0,0.2); width: auto;">
+                            <option value="all">All Prices</option>
+                            <option value="under500">Under ₹500</option>
+                            <option value="500-1000">₹500 - ₹1000</option>
+                            <option value="over1000">Over ₹1000</option>
+                        </select>
                     </div>
                 </div>
             </div>

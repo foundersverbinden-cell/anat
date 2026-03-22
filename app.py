@@ -71,9 +71,13 @@ app.register_blueprint(seller_bp, url_prefix='/api/seller')
 def serve_upload(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+@app.route('/<path:path>')
+def serve_frontend(path):
+    return send_from_directory('frontend', path)
+
 @app.route('/')
 def home():
-    return jsonify({"status": "ok", "message": "Festival Marketplace API is running"}), 200
+    return send_from_directory('frontend', 'index.html')
 
 # Basic Error handlers
 @app.errorhandler(400)

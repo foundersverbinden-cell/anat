@@ -7,46 +7,68 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="center-wrapper">
-        <div class="glass-panel auth-box">
-            <h2>FestMarket 🎪</h2>
-            <p>Your one-stop festival marketplace.</p>
-            
+    <div class="center-wrapper" style="flex-direction: column; gap: 3rem;">
+        <div style="text-align: center; max-width: 600px;">
+            <h1 style="font-size: 4rem; margin-bottom: 1rem; line-height: 1;" class="neon-text-primary">FestMarket</h1>
+            <p style="font-size: 1.25rem; color: var(--text-muted); line-height: 1.6;">
+                The premium destination for exclusive festival vibes. <br>
+                Handcrafted, verified, and delivered for your next peak experience.
+            </p>
+        </div>
+
+        <div class="glass-panel auth-box" style="padding: 2.5rem; width: 450px;">
             <div id="login-form">
+                <h2 style="margin-bottom: 2rem;">Welcome Back</h2>
                 <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="login-email" placeholder="student@college.edu">
+                    <label>Enterprise Email</label>
+                    <input type="email" id="login-email" placeholder="name@vibe.com">
                 </div>
                 <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="login-password" placeholder="********">
+                    <label>Secure Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••">
                 </div>
-                <button class="btn btn-primary" onclick="handleLogin()">Login</button>
-                <div class="mt-2">
-                    <p>New here? <a href="#" style="color:var(--primary)" onclick="toggleAuth()">Sign up</a></p>
+                <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 1rem; font-size: 1.1rem;" onclick="handleLogin()">Sign In to Dashboard</button>
+                <div class="mt-2" style="text-align: center;">
+                    <p style="color:var(--text-dim);">New to the ecosystem? <a href="#" style="color:var(--primary); font-weight: 700;" onclick="toggleAuth()">Create Account</a></p>
                 </div>
             </div>
 
             <div id="signup-form" class="hidden">
+                <h2 style="margin-bottom: 2rem;">Join the Network</h2>
                 <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="signup-email" placeholder="student@college.edu">
+                    <label>Enterprise Email</label>
+                    <input type="email" id="signup-email" placeholder="name@vibe.com">
                 </div>
                 <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="signup-password" placeholder="********">
+                    <label>Secure Password</label>
+                    <input type="password" id="signup-password" placeholder="••••••••">
                 </div>
                 <div class="form-group">
-                    <label>I am a...</label>
-                    <select id="signup-role">
-                        <option value="customer">Customer (Buy vibes)</option>
-                        <option value="seller">Seller (Sell vibes)</option>
+                    <label>Select Identity</label>
+                    <select id="signup-role" style="padding: 1rem;">
+                        <option value="customer">Vibe Customer (Buyer)</option>
+                        <option value="seller">Vibe Curator (Seller)</option>
                     </select>
                 </div>
-                <button class="btn btn-primary" onclick="handleSignup()">Sign Up</button>
-                <div class="mt-2">
-                    <p>Already have an account? <a href="#" style="color:var(--primary)" onclick="toggleAuth()">Login</a></p>
+                <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 1rem; font-size: 1.1rem;" onclick="handleSignup()">Apply for Access</button>
+                <div class="mt-2" style="text-align: center;">
+                    <p style="color:var(--text-dim);">Part of the network already? <a href="#" style="color:var(--primary); font-weight: 700;" onclick="toggleAuth()">Sign In</a></p>
                 </div>
+            </div>
+        </div>
+
+        <div class="d-flex" style="gap: 2rem; opacity: 0.5; margin-top: 2rem;">
+            <div class="d-flex" style="gap: 0.5rem; align-items: center;">
+                <span style="font-size: 1.5rem;">🔒</span>
+                <span style="font-size: 0.8rem;">AES-256 Encrypted</span>
+            </div>
+            <div class="d-flex" style="gap: 0.5rem; align-items: center;">
+                <span style="font-size: 1.5rem;">✅</span>
+                <span style="font-size: 0.8rem;">Vibe Verified Only</span>
+            </div>
+            <div class="d-flex" style="gap: 0.5rem; align-items: center;">
+                <span style="font-size: 1.5rem;">⚡</span>
+                <span style="font-size: 0.8rem;">Instant UPI Settlement</span>
             </div>
         </div>
     </div>

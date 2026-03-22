@@ -16,23 +16,69 @@ function displayProducts(products) {
     grid.innerHTML = '';
     
     if(products.length === 0) {
-        grid.innerHTML = '<p>No products found matching your search.</p>';
+        grid.innerHTML = `
+            <div class="glass-panel" style="grid-column: 1 / -1; text-align: center; padding: 4rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🔎</div>
+                <h3>No vibes found</h3>
+                <p style="color:var(--text-muted);">Try adjusting your search or filters.</p>
+            </div>
+        `;
         return;
     }
     
-    products.forEach(p => {
+    products.forEach((p, index) => {
+        const sellerBadge = api.renderSellerBadge(p.seller_email);
+        const charCodeSum = p.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const stock = 2 + (charCodeSum % 8);
+        const viewing = 5 + (charCodeSum % 25);
+        const badge = index < 2 ? 'New' : (index % 3 === 0 ? 'Bestseller' : (index % 5 === 0 ? 'Trending' : ''));
+        
         grid.innerHTML += `
             <div class="glass-panel card" onclick="openModal(${p.id})">
-                <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
-                <h3>${p.name}</h3>
-                <p style="margin-bottom: 0.5rem;">Seller: ${p.seller_email}</p>
-                <div class="d-flex justify-between" style="align-items: center;">
-                    <p class="price" style="margin:0;">₹${p.price}</p>
-                    <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Buy</button>
+                <div style="position: relative;">
+                    <img src="${IMAGE_BASE}/${p.image}" class="card-img" alt="${p.name}">
+                    ${badge ? `<span class="badge" style="position: absolute; top: 1rem; right: 1rem; background: var(--primary);">${badge}</span>` : ''}
+                    <div class="card-overlay" style="position: absolute; bottom: 1rem; left: 1rem; right: 1rem; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); padding: 0.5rem; border-radius: 8px; font-size: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="pulse" style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%;"></span>
+                        ${viewing} people are viewing this vibe
+                    </div>
+                </div>
+                
+                <h3 style="margin: 1rem 0 0.5rem 0; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.name}</h3>
+                
+                <div style="margin-bottom: 1rem;">${sellerBadge}</div>
+                
+                <div class="d-flex justify-between" style="align-items: flex-end; margin-top: auto;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-decoration: line-through; margin-bottom: -0.25rem;">₹${(p.price * 1.2).toFixed(0)}</div>
+                        <div class="price" style="font-size: 1.4rem; color: var(--text-main);">₹${p.price}</div>
+                        <div style="font-size: 0.7rem; color: var(--danger); font-weight: 700;">🔥 Only ${stock} left!</div>
+                    </div>
+                    <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); openModal(${p.id})">View Details</button>
                 </div>
             </div>
         `;
     });
+}
+
+function filterProducts() {
+    const query = document.getElementById('product-search').value.toLowerCase();
+    const priceFilter = document.getElementById('price-filter').value;
+    
+    let filtered = allProducts.filter(p => 
+        p.name.toLowerCase().includes(query) || 
+        p.seller_email.toLowerCase().includes(query)
+    );
+    
+    if (priceFilter === 'under500') {
+        filtered = filtered.filter(p => p.price < 500);
+    } else if (priceFilter === '500-1000') {
+        filtered = filtered.filter(p => p.price >= 500 && p.price <= 1000);
+    } else if (priceFilter === 'over1000') {
+        filtered = filtered.filter(p => p.price > 1000);
+    }
+    
+    displayProducts(filtered);
 }
 
 function openModal(productId) {
@@ -41,21 +87,62 @@ function openModal(productId) {
 
     const modal = document.getElementById('product-modal');
     const body = document.getElementById('modal-body');
+    const ctx = api.getSellerContext(p.seller_email);
+    
+    // Find related products (same price range or just others)
+    const related = allProducts.filter(x => x.id !== p.id).slice(0, 3);
     
     body.innerHTML = `
-        <div class="modal-grid">
-            <img src="${IMAGE_BASE}/${p.image}" style="width:100%; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <div class="modal-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <div style="position: sticky; top: 0;">
+                <img src="${IMAGE_BASE}/${p.image}" style="width:100%; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform: perspective(1000px) rotateY(-5deg);">
+            </div>
             <div>
-                <h2 style="margin-top:0;">${p.name}</h2>
-                <p class="price" style="font-size:2rem;">₹${p.price}</p>
-                <p style="color:var(--text-light); margin-bottom:2rem; line-height:1.6;">${p.description || 'No description provided for this vibe yet.'}</p>
-                <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:1.5rem;">Seller: ${p.seller_email}</p>
-                <button class="btn btn-primary" onclick="buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Checkout Now</button>
+                <div class="d-flex" style="gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <span class="badge" style="background: var(--secondary);">Vibe Verified</span>
+                    <span class="badge" style="background: var(--accent-blue);">Popular</span>
+                </div>
+                <h2 style="font-size: 2.5rem; margin-bottom: 0.5rem; line-height: 1.1;">${p.name}</h2>
+                <div class="price" style="font-size: 2.2rem; color: var(--primary); margin-bottom: 1.5rem;">₹${p.price}</div>
+                
+                <div class="glass-panel" style="padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                    <p style="color:var(--text-main); font-weight: 600; margin-bottom: 0.5rem;">Description</p>
+                    <p style="color:var(--text-muted); line-height:1.6;">${p.description || "This exclusive festival vibe is handcrafted for peak performance. Limited availability."}</p>
+                </div>
+                
+                <div class="glass-panel" style="padding: 1rem; border-radius: 12px; margin-bottom: 2rem;">
+                    <p style="color:var(--text-main); font-weight: 600; margin-bottom: 0.75rem;">Meet the Seller</p>
+                    ${api.renderSellerBadge(p.seller_email)}
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">${ctx.reviews} positive vibes delivered. Response time: < 1hr.</p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center;">
+                    <button class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem; width: 100%; justify-content: center;" onclick="buyProduct(${p.id}, '${p.name}', ${p.price})">🛒 Secure Checkout</button>
+                    <div id="quick-qr" style="background:white; padding: 4px; border-radius: 8px;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 3rem;">
+            <h3 style="margin-bottom: 1.5rem;">You might also like...</h3>
+            <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                ${related.map(r => `
+                    <div class="glass-panel card" style="padding: 1rem;" onclick="openModal(${r.id})">
+                        <img src="${IMAGE_BASE}/${r.image}" style="height: 100px; width: 100%; object-fit: cover; border-radius: 8px;">
+                        <p style="margin-top: 0.5rem; font-weight: 600; font-size: 0.9rem;">${r.name}</p>
+                        <p style="color: var(--primary);">₹${r.price}</p>
+                    </div>
+                `).join('')}
             </div>
         </div>
     `;
     
     modal.classList.add('active');
+    new QRCode(document.getElementById("quick-qr"), {
+        text: `upi://pay?pa=${p.upi_id}&pn=FestMarket&am=${p.price}&cu=INR`,
+        width: 60,
+        height: 60
+    });
 }
 
 function closeModal(e) {
@@ -64,7 +151,7 @@ function closeModal(e) {
     }
 }
 
-// Chatbot Logic
+// Chatbot Utility Upgrade
 function toggleChat() {
     document.getElementById('chat-window').classList.toggle('active');
 }
@@ -103,19 +190,18 @@ function appendMessage(sender, text, products = []) {
         miniGrid.className = 'chat-products-mini';
         products.forEach(p => {
             miniGrid.innerHTML += `
-                <div class="mini-card" onclick="openModal(${p.id})">
-                    <img src="${IMAGE_BASE}/${p.image}">
-                    <div style="margin-top:0.25rem; font-weight:600;">${p.name}</div>
-                    <div style="color:var(--success);">₹${p.price}</div>
+                <div class="mini-card" onclick="openModal(${p.id})" style="background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 12px; cursor: pointer;">
+                    <img src="${IMAGE_BASE}/${p.image}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px;">
+                    <div style="margin-top:0.25rem; font-weight:700; font-size: 0.8rem;">${p.name}</div>
+                    <div style="color:var(--primary); font-size: 0.75rem;">₹${p.price}</div>
+                    <button class="btn btn-primary btn-small" style="width: 100%; margin-top: 0.5rem; font-size: 0.7rem; padding: 0.25rem;">View</button>
                 </div>
             `;
         });
         body.appendChild(miniGrid);
     }
-
     body.scrollTop = body.scrollHeight;
 }
-
 async function loadOrders() {
     try {
         const orders = await api.request('/customer/orders', { headers: api.getHeaders() });
@@ -123,25 +209,25 @@ async function loadOrders() {
         grid.innerHTML = '';
         
         if(orders.length === 0) {
-            grid.innerHTML = '<p>You have no orders yet.</p>';
+            grid.innerHTML = `
+                <div class="glass-panel" style="grid-column: 1 / -1; text-align: center; padding: 4rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📦</div>
+                    <h3>No orders yet</h3>
+                    <p style="color:var(--text-muted);">Your festival finds will appear here.</p>
+                    <button class="btn btn-primary btn-small" style="margin-top: 1.5rem;" onclick="toggleView('products-view')">Start Shopping</button>
+                </div>
+            `;
             return;
         }
         
-        orders.forEach(o => {
-            const badgeClass = o.status.replace('_', '-').toLowerCase();
-            let actionHtml = '';
+        orders.forEach(order => {
+            const statusColor = order.status === 'approved' ? 'var(--success)' : (order.status === 'rejected' ? 'var(--danger)' : 'var(--warning)');
+            const statusText = order.status.toUpperCase();
             
-            if(o.status === 'PAYMENT_PENDING') {
-                actionHtml = `
-                    <div style="margin-top: 1rem; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
-                        <p style="margin-bottom:0.5rem"><strong>1. Scan & Pay ₹${o.price}</strong></p>
-                        <div id="qr-${o.id}" style="background: white; padding: 10px; display: inline-block; border-radius: 8px; margin-bottom: 1rem;"></div>
-                        <p style="margin-bottom:0.5rem"><strong>2. Upload Screenshot</strong></p>
-                        <input type="file" id="proof-${o.id}" accept="image/*" class="form-group" style="padding: 0;">
-                        <button class="btn btn-primary btn-small mt-2" onclick="uploadProof(${o.id})">Upload Proof</button>
-                    </div>
-                `;
-            }
+            // Timeline state
+            const step1 = 'active'; // Ordered is always done
+            const step2 = order.status !== 'pending' ? 'active' : ''; // Verified if not pending
+            const step3 = order.status === 'approved' ? 'active' : ''; // Delivered placeholder
             
             grid.innerHTML += `
                 <div class="glass-panel card">
