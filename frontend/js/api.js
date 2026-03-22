@@ -127,6 +127,10 @@ const api = {
         const hours = Math.floor(minutes / 60);
         if (hours < 24) return `${hours}h ago`;
         return date.toLocaleDateString();
+    },
+    toggleMobileMenu: () => {
+        const links = document.getElementById('nav-links');
+        if (links) links.classList.toggle('active');
     }
 };
 
