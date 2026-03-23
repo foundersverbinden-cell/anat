@@ -73,6 +73,8 @@ def serve_upload(filename):
 
 @app.route('/<path:path>')
 def serve_frontend(path):
+    if path.startswith('api/'):
+        return jsonify(error="API Route Not Found"), 404
     return send_from_directory('frontend', path)
 
 @app.route('/')
