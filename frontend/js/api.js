@@ -27,7 +27,8 @@ const api = {
     },
     request: async (endpoint, options = {}, isRetry = false) => {
         try {
-            let res = await fetch(`${API_BASE}${endpoint}`, options);
+            const fullUrl = `${API_BASE}${endpoint}`;
+            let res = await fetch(fullUrl, options);
             
             // Handle Token Expiry silently
             if (res.status === 401 && !isRetry && api.getRefreshToken()) {
@@ -38,26 +39,39 @@ const api = {
                 });
                 
                 if (refreshRes.ok) {
-                    const refreshData = await refreshRes.json();
-                    api.setToken(refreshData.token, localStorage.getItem('role'), refreshData.refresh_token);
-                    
-                    if(!options.headers) options.headers = {};
-                    options.headers['Authorization'] = `Bearer ${refreshData.token}`;
-                    
-                    res = await fetch(`${API_BASE}${endpoint}`, options);
+                    const contentType = refreshRes.headers.get("content-type");
+                    if (contentType && contentType.includes("application/json")) {
+                        const refreshData = await refreshRes.json();
+                        api.setToken(refreshData.token, localStorage.getItem('role'), refreshData.refresh_token);
+                        
+                        if(!options.headers) options.headers = {};
+                        options.headers['Authorization'] = `Bearer ${refreshData.token}`;
+                        res = await fetch(fullUrl, options);
+                    }
                 } else {
                     api.logout();
                     throw new Error('Session expired. Please login again.');
                 }
             }
             
-            const data = await res.json();
+            const contentType = res.headers.get("content-type");
+            let data;
+            
+            if (contentType && contentType.includes("application/json")) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                console.error('Non-JSON response:', text);
+                throw new Error(`Server returned non-JSON response (Status ${res.status}). Likely a routing or backend error.`);
+            }
+
             if (!res.ok) {
                 if(res.status === 401) api.logout();
-                throw new Error(data.error || 'API Error');
+                throw new Error(data.error || `API Error (${res.status})`);
             }
             return data;
         } catch (error) {
+            console.error(`Request failed [${endpoint}]:`, error);
             if(!isRetry) api.showToast(error.message, 'error');
             throw error;
         }

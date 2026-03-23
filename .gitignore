@@ -6,3 +6,4 @@ backend/__pycache__/
 backend/uploads/*
 !backend/uploads/.gitkeep
 marketplace.db
+.vercel
