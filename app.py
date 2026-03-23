@@ -53,6 +53,10 @@ def check_rate_limit(key, limit, window):
 
 @app.before_request
 def anti_abuse():
+    # Skip rate limiting for preflight CORS checks
+    if request.method == 'OPTIONS':
+        return
+    
     ip = request.remote_addr
     now = time.time()
     
