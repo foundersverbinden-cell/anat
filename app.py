@@ -11,17 +11,17 @@ import time
 
 app = Flask(__name__)
 # Enable production CORS for Vercel
-# Enable production CORS for Vercel and all its aliases
+# Robust CORS for all Vercel subdomains and local development
 CORS(app, resources={r"/api/*": {
     "origins": [
         "https://project-spdvs.vercel.app",
         "https://festmarket-vibe.vercel.app",
-        "https://*.vercel.app",
+        r"https://.*\.vercel\.app$",
         "http://localhost:3000",
-        "http://localhost:4000",
         "http://localhost:5173"
     ],
-    "supports_credentials": True
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"]
 }})
 
 # Ensure upload directory exists
