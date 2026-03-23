@@ -71,16 +71,20 @@ const api = {
                 data = await res.json();
             } else {
                 const text = await res.text();
-                console.error('Non-JSON response:', text);
-                throw new Error(`Server returned non-JSON response (Status ${res.status}). Likely a routing or backend error.`);
+                console.error('Non-JSON Response:', text);
+                throw new Error(`Server error (${res.status}). Please try again later.`);
             }
 
             if (!res.ok) {
-                if(res.status === 401) api.logout();
-                throw new Error(data.error || `API Error (${res.status})`);
+                throw new Error(data.error || data.message || `API error (${res.status})`);
             }
             return data;
         } catch (error) {
+            if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+                console.error('Network Error / CORS Issue:', error);
+                if(!isRetry) api.showToast('Network Error: Cannot reach the secure server. Please check your internet or refresh.', 'error');
+                throw new Error('Network Error: Cannot reach the secure server. Please check your internet or refresh.');
+            }
             console.error(`Request failed [${endpoint}]:`, error);
             if(!isRetry) api.showToast(error.message, 'error');
             throw error;
