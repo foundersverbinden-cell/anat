@@ -92,19 +92,21 @@ function openModal(productId) {
 
     const modal = document.getElementById('product-modal');
     const body = document.getElementById('modal-body');
-    const ctx = api.getSellerContext(p.seller_email, p.is_verified === 1);
     
-    // Find related products (same price range or just others)
+    // Find related products
     const related = allProducts.filter(x => x.id !== p.id).slice(0, 3);
     
     body.innerHTML = `
+        <div style="margin-bottom: 2rem;">
+            <button class="btn btn-outline btn-small" style="border:none; padding: 0;" onclick="closeModal()">← Back to Catalog</button>
+        </div>
         <div class="modal-grid">
             <div style="position: sticky; top: 0;">
-                <img src="${IMAGE_BASE}/${p.image}" style="width:100%; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform: perspective(1000px) rotateY(-5deg);">
+                <img src="${IMAGE_BASE}/${p.image}" style="width:100%; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5);">
             </div>
             <div>
                 <div class="d-flex" style="gap: 0.5rem; margin-bottom: 0.5rem;">
-                    ${p.is_verified === 1 ? '<span class="badge" style="background: var(--success);">Vibe Verified</span>' : ''}
+                    ${p.is_verified === 1 ? '<span class="badge" style="background: var(--success);">🛡️ Verified Seller</span>' : ''}
                     <span class="badge" style="background: var(--accent-blue);">Popular</span>
                     <span class="badge" style="background: rgba(255,255,255,0.1);"><span class="pulse" style="width: 6px; height: 6px; background: var(--accent-blue); border-radius: 50%; display: inline-block; margin-right: 4px;"></span>${p.views || 0} views</span>
                 </div>
@@ -119,11 +121,11 @@ function openModal(productId) {
                 <div class="glass-panel" style="padding: 1rem; border-radius: 12px; margin-bottom: 2rem;">
                     <p style="color:var(--text-main); font-weight: 600; margin-bottom: 0.75rem;">Meet the Seller</p>
                     ${api.renderSellerBadge(p.seller_email, p.is_verified === 1)}
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Enterprise-level delivery. Response time: < 1hr.</p>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Verified identity. Response time: < 1hr.</p>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center;">
-                    <button class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem; width: 100%; justify-content: center;" onclick="buyProduct(${p.id}, '${p.name}', ${p.price}, '${p.upi_id}')">🛒 Secure Checkout</button>
+                    <button class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem; width: 100%; justify-content: center; height: 100%;" onclick="buyProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price}, '${p.upi_id}')">🛒 Secure Checkout</button>
                     <div id="quick-qr" style="background:white; padding: 4px; border-radius: 8px;"></div>
                 </div>
             </div>
@@ -145,15 +147,30 @@ function openModal(productId) {
     
     modal.classList.add('active');
     
-    // Fix: properly encode UPI parameters
-    const encodedName = encodeURIComponent('FestMarket Curator');
-    const encodedUpiUrl = `upi://pay?pa=${p.upi_id}&pn=${encodedName}&am=${p.price}&cu=INR`;
+    // History API for Back Button support
+    history.pushState({ modalOpen: true }, '');
+    window.onpopstate = (e) => {
+        if (!e.state || !e.state.modalOpen) {
+            closeModal();
+        }
+    };
     
-    new QRCode(document.getElementById("quick-qr"), {
-        text: encodedUpiUrl,
-        width: 60,
-        height: 60
-    });
+    // Encode UPI parameters carefully
+    const encodedName = encodeURIComponent('FestMarket Marketplace');
+    const encodedNote = encodeURIComponent(`Buy ${p.name}`);
+    const encodedUpiUrl = `upi://pay?pa=${p.upi_id}&pn=${encodedName}&am=${p.price}&tn=${encodedNote}&cu=INR`;
+    
+    setTimeout(() => {
+        const qrContainer = document.getElementById("quick-qr");
+        if (qrContainer) {
+            qrContainer.innerHTML = ''; // clear previous
+            new QRCode(qrContainer, {
+                text: encodedUpiUrl,
+                width: 60,
+                height: 60
+            });
+        }
+    }, 50);
 }
 
 function closeCheckoutModal(e) {
@@ -169,21 +186,25 @@ async function buyProduct(productId, name, price, upiId) {
         api.showToast('Initiating secure checkout...', 'info');
         const res = await api.request('/customer/order', {
             method: 'POST',
+            headers: api.getHeaders(),
             body: JSON.stringify({ product_id: productId })
         });
         
-        closeModal(); // close product modal
-        resumeCheckout(res.order_id, upiId, price);
+        closeModal();
+        resumeCheckout(res.order_id, upiId, price, name);
         loadOrders();
     } catch (e) {
-        api.showToast(e.message || 'Failed to initialize checkout', 'error');
+        console.error(e);
     }
 }
 
-function resumeCheckout(orderId, upiId, price) {
-    activeCheckoutOrder = { id: orderId, upi_id: upiId, price: price };
-    renderCheckoutStep(1);
+function resumeCheckout(orderId, upiId, price, productName) {
+    activeCheckoutOrder = { id: orderId, upi_id: upiId, price: price, name: productName };
     document.getElementById('checkout-modal').classList.add('active');
+    renderCheckoutStep(1, orderId, upiId, price, productName);
+    
+    // History for checkout modal
+    history.pushState({ modalOpen: true, checkout: true }, '');
 }
 
 function copyUpi(upiId) {
@@ -192,30 +213,29 @@ function copyUpi(upiId) {
     });
 }
 
-function renderCheckoutStep(step) {
+function renderCheckoutStep(step, id, upi_id, price, productName = 'FestMarket Vibe') {
     const body = document.getElementById('checkout-body');
-    if (!activeCheckoutOrder) return;
-    
-    const { id, upi_id, price } = activeCheckoutOrder;
-    const encodedName = encodeURIComponent('FestMarket Curator');
-    const upiUrl = `upi://pay?pa=${upi_id}&pn=${encodedName}&am=${price}&cu=INR`;
+    const encodedName = encodeURIComponent('FestMarket Marketplace');
+    const encodedNote = encodeURIComponent(`Payment for ${productName} (ORD-${id})`);
+    const upiUrl = `upi://pay?pa=${upi_id}&pn=${encodedName}&am=${price}&tn=${encodedNote}&cu=INR`;
 
     if (step === 1) {
         body.innerHTML = `
             <div style="text-align: center; animation: scaleUp 0.3s ease-out;">
+                <button class="btn btn-outline btn-small" style="margin-bottom: 1rem; border: none; padding: 0;" onclick="closeCheckoutModal()">← Back to Info</button>
                 <h2 style="margin-bottom: 0.5rem;">Step 1: Secure Payment</h2>
-                <p style="color:var(--text-muted); margin-bottom: 2rem;">Scan or tap to pay ₹${price}</p>
+                <p style="color:var(--text-muted); margin-bottom: 1.5rem;">Scan or tap to pay <b style="color:var(--primary);">₹${price}</b> for ${productName}</p>
                 
                 <div id="checkout-qr" style="background:white; padding:16px; border-radius:16px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 1.5rem;"></div>
                 
-                <div class="glass-panel" style="padding: 1rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
-                    <code style="color: var(--primary); font-size: 1.1rem;">${upi_id}</code>
+                <div class="glass-panel" style="padding: 1rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1);">
+                    <code style="color: var(--primary); font-size: 1rem; letter-spacing: 0.5px;">${upi_id}</code>
                     <button class="btn btn-outline btn-small" onclick="copyUpi('${upi_id}')">Copy</button>
                 </div>
                 
                 <div class="d-flex" style="gap: 1rem;">
-                    <a href="${upiUrl}" class="btn btn-outline" style="flex: 1; justify-content: center; display: flex; text-decoration: none;">Pay via UPI App</a>
-                    <button class="btn btn-primary" style="flex: 1; justify-content: center;" onclick="renderCheckoutStep(2)">I have paid ➔</button>
+                    <a href="${upiUrl}" class="btn btn-outline" style="flex: 1; justify-content: center; display: flex; text-decoration: none; align-items: center;">📱 Pay via App</a>
+                    <button class="btn btn-primary" style="flex: 1; justify-content: center;" onclick="renderCheckoutStep(2, ${id}, '${upi_id}', ${price}, '${productName.replace(/'/g, "\\'")}')">I have paid ➔</button>
                 </div>
             </div>
         `;
@@ -233,7 +253,7 @@ function renderCheckoutStep(step) {
     } else if (step === 2) {
         body.innerHTML = `
             <div style="animation: scaleUp 0.3s ease-out;">
-                <button class="btn btn-outline btn-small" style="margin-bottom: 1rem; border: none; padding: 0;" onclick="renderCheckoutStep(1)">← Back to Payment</button>
+                <button class="btn btn-outline btn-small" style="margin-bottom: 1rem; border: none; padding: 0;" onclick="renderCheckoutStep(1, ${id}, '${upi_id}', ${price}, '${productName.replace(/'/g, "\\'")}')">← Back to Payment</button>
                 <h2 style="margin-bottom: 0.5rem;">Step 2: Upload Proof</h2>
                 <p style="color:var(--text-muted); margin-bottom: 1.5rem;">Provide your UTR and screenshot to verify the order #ORD-${id}.</p>
                 
@@ -408,14 +428,7 @@ async function loadOrders() {
                 </div>
             `;
 
-            if(o.status === 'PAYMENT_PENDING' || o.status === 'REJECTED') {
-                actionHtml = `
-                    <div class="glass-panel" style="padding:1.5rem; margin-top:1rem; border: 1px dashed var(--primary); text-align: center;">
-                        <p style="font-size:0.9rem; margin-bottom:1rem; font-weight:600; color: var(--primary);">✨ Complete Payment to Secure Vibe</p>
-                        <button class="btn btn-primary" style="width:100%; justify-content: center;" onclick="resumeCheckout(${o.id}, '${o.upi_id}', ${o.price})">Resume Checkout Process</button>
-                    </div>
-                `;
-            }
+
 
             const rejectionHtml = o.status === 'REJECTED' ? `
                 <div style="padding:0.75rem; background:rgba(255,0,0,0.1); border-left:4px solid var(--danger); border-radius:4px; margin: 1rem 0;">
@@ -441,7 +454,12 @@ async function loadOrders() {
 
                     ${timelineHtml}
                     ${rejectionHtml}
-                    ${actionHtml}
+                    ${(o.status === 'PAYMENT_PENDING' || o.status === 'REJECTED') ? `
+                        <div class="glass-panel" style="padding:1.5rem; margin-top:1rem; border: 1px dashed var(--primary); text-align: center;">
+                            <p style="font-size:0.9rem; margin-bottom:1rem; font-weight:600; color: var(--primary);">✨ Complete Payment to Secure Vibe</p>
+                            <button class="btn btn-primary" style="width:100%; justify-content: center;" onclick="resumeCheckout(${o.id}, '${o.upi_id}', ${o.price}, '${o.name.replace(/'/g, "\\'")}')">Resume Checkout Process</button>
+                        </div>
+                    ` : ''}
                 </div>
             `;
         });

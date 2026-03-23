@@ -17,9 +17,11 @@ const api = {
         window.location.href = 'index.html';
     },
     getHeaders: (isFormData = false) => {
-        const headers = {
-            'Authorization': `Bearer ${api.getToken()}`
-        };
+        const token = api.getToken();
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
         if (!isFormData) {
             headers['Content-Type'] = 'application/json';
         }
@@ -27,6 +29,14 @@ const api = {
     },
     request: async (endpoint, options = {}, isRetry = false) => {
         try {
+            // Auto-merge default headers if not provided
+            if (!options.headers) {
+                options.headers = api.getHeaders();
+            } else if (!options.headers['Authorization'] && api.getToken()) {
+                // Merge token if headers exist but lack Auth
+                options.headers['Authorization'] = `Bearer ${api.getToken()}`;
+            }
+
             const fullUrl = `${API_BASE}${endpoint}`;
             let res = await fetch(fullUrl, options);
             
@@ -152,6 +162,7 @@ const api = {
         const links = document.getElementById('nav-links');
         if (links) links.classList.toggle('active');
     },
+
     safeGet: (obj, path, fallback = '—') => {
         try {
             const value = path.split('.').reduce((acc, part) => acc && acc[part], obj);
