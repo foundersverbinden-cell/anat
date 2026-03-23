@@ -98,7 +98,7 @@ function openModal(productId) {
     
     body.innerHTML = `
         <div style="margin-bottom: 2rem;">
-            <button class="btn btn-outline btn-small" style="border:none; padding: 0;" onclick="closeModal()">← Back to Catalog</button>
+            <button class="btn btn-outline btn-small" style="border:none; padding: 0;" onclick="history.back()">← Back to Catalog</button>
         </div>
         <div class="modal-grid">
             <div style="position: sticky; top: 0;">
@@ -124,9 +124,8 @@ function openModal(productId) {
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Verified identity. Response time: < 1hr.</p>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center;">
+                <div style="display: flex; gap: 1rem; align-items: center;">
                     <button class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem; width: 100%; justify-content: center; height: 100%;" onclick="buyProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price}, '${p.upi_id}')">🛒 Secure Checkout</button>
-                    <div id="quick-qr" style="background:white; padding: 4px; border-radius: 8px;"></div>
                 </div>
             </div>
         </div>
@@ -160,17 +159,13 @@ function openModal(productId) {
     const encodedNote = encodeURIComponent(`Buy ${p.name}`);
     const encodedUpiUrl = `upi://pay?pa=${p.upi_id}&pn=${encodedName}&am=${p.price}&tn=${encodedNote}&cu=INR`;
     
-    setTimeout(() => {
-        const qrContainer = document.getElementById("quick-qr");
-        if (qrContainer) {
-            qrContainer.innerHTML = ''; // clear previous
-            new QRCode(qrContainer, {
-                text: encodedUpiUrl,
-                width: 60,
-                height: 60
-            });
-        }
-    }, 50);
+    // QR generation removed for mini-qr to reduce clutter
+}
+
+function closeModal(e) {
+    if(!e || e.target.id === 'product-modal' || e.target.className === 'modal-close') {
+        document.getElementById('product-modal').classList.remove('active');
+    }
 }
 
 function closeCheckoutModal(e) {
