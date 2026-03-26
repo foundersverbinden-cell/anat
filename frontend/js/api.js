@@ -1,7 +1,7 @@
 // Deployment Configuration
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:5000' 
-    : window.location.origin;
+    : 'https://anat-production.up.railway.app'; // Replace with your Render URL if different
 
 const API_BASE = `${API_BASE_URL}/api`;
 const IMAGE_BASE = `${API_BASE_URL}/uploads`;

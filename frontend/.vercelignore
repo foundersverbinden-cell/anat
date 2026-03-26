@@ -1,0 +1,12 @@
+app.py
+routes/
+models/
+requirements.txt
+Procfile
+venv/
+.pytest_cache/
+__pycache__/
+*.db
+uploads/
+brain/
+*.md
