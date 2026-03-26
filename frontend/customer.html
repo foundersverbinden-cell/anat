@@ -52,24 +52,44 @@
                 </div>
             </div>
 
+            <!-- New Inline Vibe Assistant Panel -->
+            <div class="vibe-assistant-panel glass-panel">
+                <div class="assistant-header">
+                    <h2 class="neon-text-main">✨ Vibe Assistant</h2>
+                    <p style="color:var(--text-muted); font-size: 0.9rem;">Your personal guided decision engine.</p>
+                </div>
+                
+                <div class="assistant-input-wrapper">
+                    <input type="text" id="assistant-input" placeholder="What vibe do you want? (e.g. healthy protein, spicy snacks)" onkeypress="if(event.key === 'Enter') sendAssistantQuery()">
+                    <button class="btn btn-primary" onclick="sendAssistantQuery()">Guide Me</button>
+                </div>
+
+                <div class="quick-filters">
+                    <span class="label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Quick Filters:</span>
+                    <div class="filter-chips">
+                        <div class="chip chip-small" onclick="applyQuickFilter('under100')">Under ₹100</div>
+                        <div class="chip chip-small" onclick="applyQuickFilter('trending')">Trending</div>
+                        <div class="chip chip-small" onclick="applyQuickFilter('protein')">High Protein</div>
+                        <div class="chip chip-small" onclick="applyQuickFilter('budget')">Budget Picks</div>
+                    </div>
+                </div>
+
+                <div id="assistant-status" class="assistant-status"></div>
+
+                <div id="assistant-results" class="assistant-results-grid scroll-x">
+                    <!-- Dynamic recommendations will load here -->
+                </div>
+            </div>
+
             <div class="glass-panel" style="margin-bottom: 2rem; padding: 1.5rem;">
                 <div class="d-flex justify-between" style="align-items: center; flex-wrap: wrap; gap: 1.5rem;">
                     <div>
-                        <h2 class="section-title" style="margin-bottom: 0.25rem;">Explore the Catalog</h2>
-                        <p style="color:var(--text-muted); font-size: 0.9rem;">Find the perfect vibe for your next festival.</p>
+                        <h2 class="section-title" style="margin-bottom: 0.25rem;">Explore the Full Catalog</h2>
+                        <p style="color:var(--text-muted); font-size: 0.85rem;">Secondary discovery for more vibes.</p>
                     </div>
                     
                     <div class="d-flex" style="gap: 1rem; align-items: center; flex: 1; min-width: 300px; justify-content: flex-end;">
-                        <div style="position: relative; flex: 1; max-width: 400px;">
-                            <span style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); opacity: 0.5;">🔍</span>
-                            <input type="text" id="product-search" placeholder="Search by product or seller..." oninput="filterProducts()" style="width: 100%; padding-left: 2.8rem; border-radius: 50px; background: rgba(0,0,0,0.2);">
-                        </div>
-                        <select id="price-filter" onchange="filterProducts()" style="padding: 0.75rem 1rem; border-radius: 50px; background: rgba(0,0,0,0.2); width: auto;">
-                            <option value="all">All Prices</option>
-                            <option value="under500">Under ₹500</option>
-                            <option value="500-1000">₹500 - ₹1000</option>
-                            <option value="over1000">Over ₹1000</option>
-                        </select>
+                        <input type="text" id="product-search" placeholder="Search deeper..." oninput="filterProducts()" style="width: 100%; max-width: 300px; padding: 0.75rem 1.2rem; border-radius: 50px; background: rgba(0,0,0,0.2);">
                     </div>
                 </div>
             </div>
@@ -78,60 +98,6 @@
                 <!-- Products dynamically loaded here -->
             </div>
         </div>
-        
-        <!-- Orders View -->
-        <div id="orders-view" class="hidden">
-            <div class="d-flex justify-between" style="align-items: center; margin-bottom: 2rem;">
-                <h2>My Orders</h2>
-                <button class="btn btn-outline btn-small" onclick="toggleView('products-view')">Back to Shop</button>
-            </div>
-            <div class="grid" id="orders-grid">
-                <!-- Orders dynamically loaded here -->
-            </div>
-        </div>
-    </div>
-    
-    <!-- Product Detail Modal -->
-    <div id="product-modal" class="modal-overlay" onclick="closeModal(event)">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <button class="modal-close" onclick="closeModal()">×</button>
-            <div id="modal-body">
-                <!-- Content injected via JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Step-Based Checkout Modal -->
-    <div id="checkout-modal" class="modal-overlay" onclick="closeCheckoutModal(event)">
-        <div class="modal-content" style="max-width: 500px;" onclick="event.stopPropagation()">
-            <button class="modal-close" onclick="closeCheckoutModal()">×</button>
-            <div id="checkout-body">
-                <!-- Checkout steps injected via JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- AI Chatbot Widget -->
-    <div class="chat-widget">
-        <div id="chat-window" class="chat-window">
-            <div class="chat-header">
-                <h3>Vibe Assistant ✨</h3>
-                <button onclick="toggleChat()" style="background:none; border:none; color:white; cursor:pointer;">&times;</button>
-            </div>
-            <div id="chat-body" class="chat-body">
-                <div class="chat-bubble bubble-ai">
-                    Hey! I'm your Vibe Assistant. Looking for something specific? Spicy food? Healthy snacks? Just ask!
-                </div>
-            </div>
-            <div class="chat-footer">
-                <input type="text" id="chat-input" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendChatMessage()">
-                <button class="btn btn-primary btn-small" onclick="sendChatMessage()" style="width: auto;">Send</button>
-            </div>
-        </div>
-        <div class="chat-btn" onclick="toggleChat()">
-            💬
-        </div>
-    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="js/api.js"></script>

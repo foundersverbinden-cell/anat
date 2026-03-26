@@ -7,6 +7,10 @@ async function loadProducts() {
     try {
         api.renderSkeletons('products-grid', 8);
         allProducts = await api.request('/customer/products', { headers: api.getHeaders() });
+        
+        // Initial Startup: Load Trending directly into Assistant
+        applyQuickFilter('trending');
+        
         displayProducts(allProducts);
         loadSocialProofTicker();
     } catch (e) {
@@ -19,13 +23,15 @@ function displayProducts(products) {
     grid.innerHTML = '';
     
     if(products.length === 0) {
+        const trending = allProducts.filter(p => (p.views || 0) > 0).sort((a,b) => (b.views||0) - (a.views||0)).slice(0, 4);
         grid.innerHTML = `
-            <div class="glass-panel" style="grid-column: 1 / -1; text-align: center; padding: 4rem;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">🔎</div>
-                <h3>No vibes found</h3>
-                <p style="color:var(--text-muted);">Try adjusting your search or filters.</p>
+            <div class="glass-panel" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+                <div style="font-size: 2rem; margin-bottom: 1rem;">✨</div>
+                <h3>No exact matches found</h3>
+                <p style="color:var(--text-muted); margin-bottom: 2rem;">But here are some vibes others are loving right now!</p>
             </div>
         `;
+        displayProducts(trending); // Recursively show trending instead of empty
         return;
     }
     
@@ -106,11 +112,10 @@ function filterProducts() {
 }
 
 function filterByIntent(intent, el) {
-    // Custom intent opens chatbot
+    // Custom intent focuses assistant
     if (intent === 'custom') {
-        toggleChat();
-        document.getElementById('chat-input').focus();
-        document.getElementById('chat-input').placeholder = "Tell me exactly what vibe you need...";
+        document.getElementById('assistant-input').focus();
+        document.getElementById('assistant-input').placeholder = "What exactly are you looking for?";
         return;
     }
 
@@ -402,68 +407,85 @@ function parseIntent(inputText) {
     return result;
 }
 
-// Chatbot Utility Upgrade
-function toggleChat() {
-    document.getElementById('chat-window').classList.toggle('active');
-}
+// --- NEW Vibe Assistant Logic (Inline) ---
 
-async function sendChatMessage() {
-    const input = document.getElementById('chat-input');
+async function sendAssistantQuery() {
+    const input = document.getElementById('assistant-input');
+    const status = document.getElementById('assistant-status');
     const text = input.value.trim();
     if(!text) return;
 
-    appendMessage('user', text);
-    input.value = '';
-
+    status.innerText = "Finding best vibes...";
+    
     try {
         const intent = parseIntent(text);
         
-        let products = [];
-        let aiResponse = "I have some great vibes for you!";
+        const params = new URLSearchParams();
+        if (intent.category) params.append('category', intent.category);
+        if (intent.maxPrice) params.append('max_price', intent.maxPrice);
+        if (intent.keywords.length > 0) params.append('keyword', intent.keywords[0]);
 
-        // Decision Assistant Flow: Prioritize Recommendations
-        if (intent.category || intent.maxPrice || intent.keywords.length > 0) {
-            const params = new URLSearchParams();
-            if (intent.category) params.append('category', intent.category);
-            if (intent.maxPrice) params.append('max_price', intent.maxPrice);
-            if (intent.keywords.length > 0) params.append('keyword', intent.keywords[0]);
+        const products = await api.request(`/customer/recommend?${params.toString()}`, {
+            headers: api.getHeaders()
+        });
 
-            products = await api.request(`/customer/recommend?${params.toString()}`, {
-                headers: api.getHeaders()
-            });
-
-            // Fallback Logic: If no products found, try a broader search
-            if (products.length === 0 && (intent.maxPrice || intent.category)) {
-                aiResponse = `I couldn't find matches for exactly that, but check out these trending items instead!`;
-                // Suggestion: Price hint or general trending
-                if (intent.maxPrice) aiResponse = `No items found under ₹${intent.maxPrice}. I've broadened the search for you!`;
-                
-                const broadParams = new URLSearchParams();
-                if (intent.category) broadParams.append('category', intent.category);
-                // Omit max_price for broadening
-                products = await api.request(`/customer/recommend?${broadParams.toString()}`, {
-                    headers: api.getHeaders()
-                });
-            }
-
-            // Sync Main Shop View
-            applyIntentToFilters(intent);
-        } else {
-            // Standard Chat Fallback
-            const data = await api.request('/customer/chat', {
-                method: 'POST',
-                headers: api.getHeaders(),
-                body: JSON.stringify({ message: text })
-            });
-            aiResponse = data.response;
-            products = data.products;
-        }
-
-        appendMessage('ai', aiResponse, products);
+        renderAssistantResults(products, text);
+        status.innerText = products.length > 0 ? "Guidance complete." : "No direct matches, showing alternatives.";
+        
+        // Push intent to full catalog filters too
+        applyIntentToFilters(intent);
     } catch (e) {
         console.error(e);
-        appendMessage('ai', "Sorry, I'm having trouble connecting to the Vibe engine. Try again?");
+        status.innerText = "Connection lost. Try again?";
     }
+}
+
+async function applyQuickFilter(type) {
+    const status = document.getElementById('assistant-status');
+    status.innerText = `Applying ${type} filter...`;
+    
+    let params = new URLSearchParams();
+    if (type === 'under100') params.append('max_price', '100');
+    if (type === 'trending') params.append('category', 'trending');
+    if (type === 'protein') params.append('keyword', 'protein');
+    if (type === 'budget') params.append('category', 'budget');
+
+    try {
+        const products = await api.request(`/customer/recommend?${params.toString()}`, {
+            headers: api.getHeaders()
+        });
+        renderAssistantResults(products, type.toUpperCase());
+        status.innerText = "";
+    } catch(e) { console.error(e); }
+}
+
+function renderAssistantResults(products, contextLabel) {
+    const container = document.getElementById('assistant-results');
+    container.innerHTML = '';
+
+    if (products.length === 0) {
+        // Fallback to trending directly in the panel
+        const fallback = allProducts.slice(0, 3);
+        renderAssistantResults(fallback, "TRENDING ALTERNATIVES");
+        return;
+    }
+
+    products.forEach(p => {
+        const tags = getVibeTags(p.description, p.name, p.price);
+        container.innerHTML += `
+            <div class="recommendation-card" onclick="openModal(${p.id})">
+                <span class="rec-badge">Best Match</span>
+                <img src="${IMAGE_BASE}/${p.image}" class="rec-img">
+                <div class="rec-info">
+                    <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">${p.name}</div>
+                    <div style="color: var(--primary); font-weight: 700; font-size: 0.9rem;">₹${p.price}</div>
+                    <div class="tag-container">
+                        ${tags.map(t => `<span class="tag-badge vibe-${t.type}">${t.label}</span>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
 }
 
 function applyIntentToFilters(intent) {
