@@ -8,8 +8,8 @@ async function loadProducts() {
         api.renderSkeletons('products-grid', 8);
         allProducts = await api.request('/customer/products', { headers: api.getHeaders() });
         
-        // Initial Startup: Load Trending directly into Assistant
-        applyQuickFilter('trending');
+        // Phase 8: Default Load (CRITICAL)
+        handleAssistant({ category: "trending" });
         
         displayProducts(allProducts);
         loadSocialProofTicker();
@@ -112,25 +112,17 @@ function filterProducts() {
 }
 
 function filterByIntent(intent, el) {
-    // Custom intent focuses assistant
     if (intent === 'custom') {
         document.getElementById('assistant-input').focus();
-        document.getElementById('assistant-input').placeholder = "What exactly are you looking for?";
         return;
     }
 
-    // Toggle active state
-    if (activeIntent === intent) {
-        activeIntent = null;
-        el.classList.remove('active');
-    } else {
-        // Remove active from others
-        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-        activeIntent = intent;
-        el.classList.add('active');
-    }
-    
-    filterProducts();
+    // Toggle active state for UI
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+
+    // STEP 3 — FIX INTENT CHIPS
+    handleAssistant({ category: intent });
 }
 
 function openModal(productId) {
@@ -407,85 +399,118 @@ function parseIntent(inputText) {
     return result;
 }
 
-// --- NEW Vibe Assistant Logic (Inline) ---
+// --------------------------------------------------
+// STEP 1 — CREATE CENTRAL CONTROLLER
+// --------------------------------------------------
 
-async function sendAssistantQuery() {
+async function handleAssistant(filters = {}) {
+    showLoading();
+
+    try {
+        const products = await fetchRecommendations(filters);
+
+        if (!products || products.length === 0) {
+            showFallback();
+            return;
+        }
+
+        renderProducts(products);
+
+    } catch (error) {
+        console.error(error);
+        showError();
+    }
+}
+
+// STEP 2 — FIX INPUT (GUIDE ME BUTTON)
+function sendAssistantQuery() {
     const input = document.getElementById('assistant-input');
-    const status = document.getElementById('assistant-status');
     const text = input.value.trim();
     if(!text) return;
 
-    status.innerText = "Finding best vibes...";
-    
-    try {
-        const intent = parseIntent(text);
-        
-        const params = new URLSearchParams();
-        if (intent.category) params.append('category', intent.category);
-        if (intent.maxPrice) params.append('max_price', intent.maxPrice);
-        if (intent.keywords.length > 0) params.append('keyword', intent.keywords[0]);
-
-        const products = await api.request(`/customer/recommend?${params.toString()}`, {
-            headers: api.getHeaders()
-        });
-
-        renderAssistantResults(products, text);
-        status.innerText = products.length > 0 ? "Guidance complete." : "No direct matches, showing alternatives.";
-        
-        // Push intent to full catalog filters too
-        applyIntentToFilters(intent);
-    } catch (e) {
-        console.error(e);
-        status.innerText = "Connection lost. Try again?";
-    }
+    const parsedFilters = parseIntent(text);
+    handleAssistant(parsedFilters);
 }
 
-async function applyQuickFilter(type) {
-    const status = document.getElementById('assistant-status');
-    status.innerText = `Applying ${type} filter...`;
-    
-    let params = new URLSearchParams();
-    if (type === 'under100') params.append('max_price', '100');
-    if (type === 'trending') params.append('category', 'trending');
-    if (type === 'protein') params.append('keyword', 'protein');
-    if (type === 'budget') params.append('category', 'budget');
+// STEP 4 — FIX QUICK FILTERS
+function applyQuickFilter(type) {
+    let filters = {};
+    if (type === 'under100') filters.max_price = 100;
+    if (type === 'trending') filters.category = "trending";
+    if (type === 'protein') filters.keyword = "protein";
+    if (type === 'budget') filters.category = "budget";
 
-    try {
-        const products = await api.request(`/customer/recommend?${params.toString()}`, {
-            headers: api.getHeaders()
-        });
-        renderAssistantResults(products, type.toUpperCase());
-        status.innerText = "";
-    } catch(e) { console.error(e); }
+    handleAssistant(filters);
 }
 
-function renderAssistantResults(products, contextLabel) {
-    const container = document.getElementById('assistant-results');
-    container.innerHTML = '';
+// STEP 5 — FIX parseIntent FUNCTION
+function parseIntent(text) {
+    text = text.toLowerCase();
+    let filters = {};
 
-    if (products.length === 0) {
-        // Fallback to trending directly in the panel
-        const fallback = allProducts.slice(0, 3);
-        renderAssistantResults(fallback, "TRENDING ALTERNATIVES");
-        return;
-    }
+    if (text.includes("healthy")) filters.category = "healthy";
+    if (text.includes("budget") || text.includes("cheap")) filters.category = "budget";
+    if (text.includes("fast")) filters.category = "fast";
+    if (text.includes("premium")) filters.category = "premium";
+    if (text.includes("trending")) filters.category = "trending";
+
+    let priceMatch = text.match(/\d+/);
+    if (priceMatch) filters.max_price = parseInt(priceMatch[0]);
+
+    if (text.includes("protein")) filters.keyword = "protein";
+    if (text.includes("spicy")) filters.keyword = "spicy";
+
+    return filters;
+}
+
+// STEP 6 — FIX fetchRecommendations
+async function fetchRecommendations(filters = {}) {
+    // Use the existing api.request for auth/headers, but build the query as requested
+    let path = '/customer/recommend?';
+
+    if (filters.category) path += `category=${filters.category}&`;
+    if (filters.max_price) path += `max_price=${filters.max_price}&`;
+    if (filters.keyword) path += `keyword=${filters.keyword}&`;
+
+    return await api.request(path, { headers: api.getHeaders() });
+}
+
+// STEP 7 — FIX RENDERING
+function renderProducts(products) {
+    const container = document.getElementById("assistant-results");
+    container.innerHTML = "";
 
     products.forEach(p => {
         const tags = getVibeTags(p.description, p.name, p.price);
         container.innerHTML += `
-            <div class="recommendation-card" onclick="openModal(${p.id})">
-                <span class="rec-badge">Best Match</span>
-                <img src="${IMAGE_BASE}/${p.image}" class="rec-img">
-                <div class="rec-info">
-                    <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">${p.name}</div>
-                    <div style="color: var(--primary); font-weight: 700; font-size: 0.9rem;">₹${p.price}</div>
-                    <div class="tag-container">
-                        ${tags.map(t => `<span class="tag-badge vibe-${t.type}">${t.label}</span>`).join('')}
-                    </div>
+        <div class="recommendation-card" onclick="openModal(${p.id})">
+            <span class="rec-badge">Best Match</span>
+            <img src="${IMAGE_BASE}/${p.image}" class="rec-img" />
+            <div class="rec-info">
+                <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">${p.name}</div>
+                <div style="color: var(--primary); font-weight: 700; font-size: 0.9rem;">₹${p.price}</div>
+                <div class="tag-container">
+                    ${tags.map(t => `<span class="tag-badge vibe-${t.type}">${t.label}</span>`).join('')}
                 </div>
             </div>
-        `;
+        </div>`;
     });
+}
+
+// STEP 9 — FALLBACK (NO EMPTY SCREEN)
+function showFallback() {
+    handleAssistant({ category: "trending" });
+}
+
+// STEP 10 — LOADING + ERROR
+function showLoading() {
+    document.getElementById("assistant-results").innerHTML = 
+        '<div style="text-align:center; padding: 2rem; color: var(--primary);">Finding best vibes...</div>';
+}
+
+function showError() {
+    document.getElementById("assistant-results").innerHTML =
+        '<div style="text-align:center; padding: 2rem; color: var(--danger);">Something went wrong. Try again.</div>';
 }
 
 function applyIntentToFilters(intent) {
