@@ -512,58 +512,6 @@ function applyIntentToFilters(intent) {
     filterProducts();
 }
 
-function appendMessage(sender, text, products = []) {
-    const body = document.getElementById('chat-body');
-    const bubble = document.createElement('div');
-    bubble.className = `chat-bubble bubble-${sender}`;
-    bubble.innerText = text;
-    body.appendChild(bubble);
-
-    if(products && products.length > 0) {
-        // Recommendations Section
-        const recSection = document.createElement('div');
-        recSection.className = 'chat-recommendations';
-        
-        const header = document.createElement('div');
-        header.className = 'recommendation-header';
-        header.innerHTML = `<span>✨</span> Top Matches`;
-        recSection.appendChild(header);
-
-        const detailGrid = document.createElement('div');
-        detailGrid.className = 'chat-products-detailed';
-        
-        products.forEach(p => {
-            const tags = getVibeTags(p.description, p.name, p.price);
-            detailGrid.innerHTML += `
-                <div class="recommendation-card" onclick="openModal(${p.id})">
-                    <span class="rec-badge">Recommended for you</span>
-                    <img src="${IMAGE_BASE}/${p.image}" class="rec-img">
-                    <div class="rec-info">
-                        <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">${p.name}</div>
-                        <div style="color: var(--primary); font-weight: 700; font-size: 0.9rem;">₹${p.price}</div>
-                        <div class="tag-container">
-                            ${tags.map(t => `<span class="tag-badge vibe-${t.type}">${t.label}</span>`).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        recSection.appendChild(detailGrid);
-        body.appendChild(recSection);
-    } else if (sender === 'ai') {
-        // Micro-suggestions if no products found or small results
-        const suggestions = getMicroSuggestions();
-        if (suggestions) {
-            const sugEl = document.createElement('div');
-            sugEl.className = 'micro-suggestion';
-            sugEl.innerHTML = `💡 <b>Vibe Tip:</b> ${suggestions}`;
-            body.appendChild(sugEl);
-        }
-    }
-
-    body.scrollTop = body.scrollHeight;
-}
-
 function getVibeTags(desc, name, price) {
     const text = (desc + ' ' + name).toLowerCase();
     const tags = [];
@@ -581,7 +529,7 @@ function getVibeTags(desc, name, price) {
 }
 
 function getMicroSuggestions() {
-    const query = document.getElementById('chat-input').value.toLowerCase();
+    const query = document.getElementById('assistant-input').value.toLowerCase();
     // Logic based on global state or recent intent
     if (activeIntent === 'budget') return "Try increasing your budget for more premium options.";
     if (allProducts.length > 10) return "Explore our trending items section for the most viral vibes.";
