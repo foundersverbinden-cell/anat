@@ -1,7 +1,0 @@
-{
-  "name": "festmarket-vibe",
-  "public": true,
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/frontend/$1" }
-  ]
-}
