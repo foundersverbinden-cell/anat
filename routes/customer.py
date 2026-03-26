@@ -218,3 +218,54 @@ def recently_purchased(current_user):
     feed = [dict(row) for row in c.fetchall()]
     conn.close()
     return jsonify(feed), 200
+@customer_bp.route('/recommend', methods=['GET'])
+@token_required(allowed_roles=['customer'])
+def recommend_products(current_user):
+    category = request.args.get('category')
+    max_price = request.args.get('max_price')
+    keyword = request.args.get('keyword')
+    
+    conn = get_db()
+    c = conn.cursor()
+    
+    query = "SELECT p.*, u.email as seller_email, u.is_verified FROM products p JOIN users u ON p.seller_id = u.id WHERE 1=1"
+    params = []
+    
+    if max_price:
+        try:
+            query += " AND p.price <= ?"
+            params.append(float(max_price))
+        except ValueError:
+            pass
+        
+    # Standard Vibe Keywords mapping (Sync with frontend chips)
+    vibe_map = {
+        'healthy': ['healthy', 'organic', 'fresh', 'vegan', 'green', 'clean', 'natural'],
+        'budget': ['budget', 'cheap', 'affordable', 'low price', 'deal'],
+        'fast': ['fast', 'quick', 'instant', 'speedy', 'express'],
+        'premium': ['premium', 'luxury', 'exclusive', 'high-end', 'elite']
+    }
+    
+    search_terms = []
+    if category and category.lower() in vibe_map:
+        search_terms.extend(vibe_map[category.lower()])
+    if keyword:
+        search_terms.append(keyword.lower())
+        
+    if search_terms:
+        # Build a complex LIKE clause for any of the terms matching (OR logic within terms)
+        like_clauses = []
+        for term in search_terms:
+            like_clauses.append("(p.name LIKE ? OR p.description LIKE ?)")
+            params.append(f"%{term}%")
+            params.append(f"%{term}%")
+        query += " AND (" + " OR ".join(like_clauses) + ")"
+        
+    # Sort by views (popularity)
+    query += " ORDER BY p.views DESC"
+    
+    c.execute(query, params)
+    products = [dict(row) for row in c.fetchall()]
+    conn.close()
+    
+    return jsonify(products), 200

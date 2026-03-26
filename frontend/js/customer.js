@@ -1,6 +1,7 @@
 requireAuth('customer');
 
 let allProducts = [];
+let activeIntent = null;
 
 async function loadProducts() {
     try {
@@ -63,11 +64,36 @@ function filterProducts() {
     const query = document.getElementById('product-search').value.toLowerCase();
     const priceFilter = document.getElementById('price-filter').value;
     
-    let filtered = allProducts.filter(p => 
+    let filtered = allProducts;
+
+    // Apply Intent Filter if active
+    if (activeIntent) {
+        if (activeIntent === 'healthy') {
+            const keywords = ['healthy', 'organic', 'fresh', 'vegan', 'green', 'clean', 'natural', 'fruit', 'salad'];
+            filtered = filtered.filter(p => keywords.some(k => p.name.toLowerCase().includes(k) || p.description.toLowerCase().includes(k)));
+        } else if (activeIntent === 'budget') {
+            filtered = filtered.filter(p => p.price < 500);
+        } else if (activeIntent === 'fast') {
+            const keywords = ['fast', 'quick', 'instant', 'speedy', 'express', 'ready'];
+            filtered = filtered.filter(p => keywords.some(k => p.name.toLowerCase().includes(k) || p.description.toLowerCase().includes(k)));
+        } else if (activeIntent === 'premium') {
+            const keywords = ['premium', 'luxury', 'exclusive', 'high-end', 'elite', 'gold', 'vip'];
+            filtered = filtered.filter(p => p.price > 1000 || keywords.some(k => p.name.toLowerCase().includes(k) || p.description.toLowerCase().includes(k)));
+        } else if (activeIntent === 'trending') {
+            // Sort by views and take top performers (simulated as those with > 5 views for now or top 20%)
+            const avgViews = filtered.length > 0 ? filtered.reduce((acc, p) => acc + (p.views || 0), 0) / filtered.length : 0;
+            filtered = filtered.filter(p => (p.views || 0) >= avgViews && (p.views || 0) > 0);
+            filtered.sort((a, b) => (b.views || 0) - (a.views || 0));
+        }
+    }
+    
+    // Apply Search Query
+    filtered = filtered.filter(p => 
         p.name.toLowerCase().includes(query) || 
         p.seller_email.toLowerCase().includes(query)
     );
     
+    // Apply Price Dropdown Filter
     if (priceFilter === 'under500') {
         filtered = filtered.filter(p => p.price < 500);
     } else if (priceFilter === '500-1000') {
@@ -77,6 +103,29 @@ function filterProducts() {
     }
     
     displayProducts(filtered);
+}
+
+function filterByIntent(intent, el) {
+    // Custom intent opens chatbot
+    if (intent === 'custom') {
+        toggleChat();
+        document.getElementById('chat-input').focus();
+        document.getElementById('chat-input').placeholder = "Tell me exactly what vibe you need...";
+        return;
+    }
+
+    // Toggle active state
+    if (activeIntent === intent) {
+        activeIntent = null;
+        el.classList.remove('active');
+    } else {
+        // Remove active from others
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        activeIntent = intent;
+        el.classList.add('active');
+    }
+    
+    filterProducts();
 }
 
 function openModal(productId) {
@@ -155,7 +204,7 @@ function openModal(productId) {
     };
     
     // Encode UPI parameters carefully
-    const encodedName = encodeURIComponent('FestMarket Marketplace');
+    const encodedName = encodeURIComponent('Aivore Marketplace');
     const encodedNote = encodeURIComponent(`Buy ${p.name}`);
     const encodedUpiUrl = `upi://pay?pa=${p.upi_id}&pn=${encodedName}&am=${p.price}&tn=${encodedNote}&cu=INR`;
     
@@ -208,9 +257,9 @@ function copyUpi(upiId) {
     });
 }
 
-function renderCheckoutStep(step, id, upi_id, price, productName = 'FestMarket Vibe') {
+function renderCheckoutStep(step, id, upi_id, price, productName = 'Aivore Vibe') {
     const body = document.getElementById('checkout-body');
-    const encodedName = encodeURIComponent('FestMarket Marketplace');
+    const encodedName = encodeURIComponent('Aivore Marketplace');
     const encodedNote = encodeURIComponent(`Payment for ${productName} (ORD-${id})`);
     const upiUrl = `upi://pay?pa=${upi_id}&pn=${encodedName}&am=${price}&tn=${encodedNote}&cu=INR`;
 
@@ -325,6 +374,34 @@ async function submitCheckoutPayment(orderId) {
     }
 }
 
+function parseIntent(inputText) {
+    const text = inputText.toLowerCase();
+    const result = {
+        category: null,
+        maxPrice: null,
+        keywords: []
+    };
+
+    // 1. Identify Categories
+    if (text.includes('healthy') || text.includes('organic') || text.includes('fresh')) result.category = 'healthy';
+    else if (text.includes('budget') || text.includes('cheap') || text.includes('affordable') || text.includes('low price')) result.category = 'budget';
+    else if (text.includes('fast') || text.includes('quick') || text.includes('instant')) result.category = 'fast';
+    else if (text.includes('premium') || text.includes('luxury') || text.includes('exclusive')) result.category = 'premium';
+
+    // 2. Extract Price Constraints (e.g., "under 100", "below 500")
+    const priceMatch = text.match(/(?:under|below|less than|max|budget of)\s*(\d+)/) || text.match(/under(\d+)/);
+    if (priceMatch) {
+        result.maxPrice = parseFloat(priceMatch[1]);
+    }
+
+    // 3. Extract Keywords
+    const stopWords = new Set(['i', 'want', 'to', 'eat', 'some', 'looking', 'for', 'a', 'an', 'the', 'is', 'are', 'show', 'me', 'food', 'snacks', 'under', 'below', 'healthy', 'budget', 'cheap', 'fast', 'premium', 'luxury', 'exclusive', 'affordable', 'quick', 'instant', 'vibe', 'vibes', 'please', 'assist', 'me', 'with', 'find', 'searching']);
+    const words = text.replace(/[^\w\s]/g, '').split(/\s+/);
+    result.keywords = words.filter(word => !stopWords.has(word) && word.length > 2 && isNaN(word));
+
+    return result;
+}
+
 // Chatbot Utility Upgrade
 function toggleChat() {
     document.getElementById('chat-window').classList.toggle('active');
@@ -339,17 +416,78 @@ async function sendChatMessage() {
     input.value = '';
 
     try {
-        const data = await api.request('/customer/chat', {
-            method: 'POST',
-            headers: api.getHeaders(),
-            body: JSON.stringify({ message: text })
-        });
+        const intent = parseIntent(text);
+        
+        let products = [];
+        let aiResponse = "I have some great vibes for you!";
 
-        appendMessage('ai', data.response, data.products);
+        // Decision Assistant Flow: Prioritize Recommendations
+        if (intent.category || intent.maxPrice || intent.keywords.length > 0) {
+            const params = new URLSearchParams();
+            if (intent.category) params.append('category', intent.category);
+            if (intent.maxPrice) params.append('max_price', intent.maxPrice);
+            if (intent.keywords.length > 0) params.append('keyword', intent.keywords[0]);
+
+            products = await api.request(`/customer/recommend?${params.toString()}`, {
+                headers: api.getHeaders()
+            });
+
+            // Fallback Logic: If no products found, try a broader search
+            if (products.length === 0 && (intent.maxPrice || intent.category)) {
+                aiResponse = `I couldn't find matches for exactly that, but check out these trending items instead!`;
+                // Suggestion: Price hint or general trending
+                if (intent.maxPrice) aiResponse = `No items found under ₹${intent.maxPrice}. I've broadened the search for you!`;
+                
+                const broadParams = new URLSearchParams();
+                if (intent.category) broadParams.append('category', intent.category);
+                // Omit max_price for broadening
+                products = await api.request(`/customer/recommend?${broadParams.toString()}`, {
+                    headers: api.getHeaders()
+                });
+            }
+
+            // Sync Main Shop View
+            applyIntentToFilters(intent);
+        } else {
+            // Standard Chat Fallback
+            const data = await api.request('/customer/chat', {
+                method: 'POST',
+                headers: api.getHeaders(),
+                body: JSON.stringify({ message: text })
+            });
+            aiResponse = data.response;
+            products = data.products;
+        }
+
+        appendMessage('ai', aiResponse, products);
     } catch (e) {
         console.error(e);
         appendMessage('ai', "Sorry, I'm having trouble connecting to the Vibe engine. Try again?");
     }
+}
+
+function applyIntentToFilters(intent) {
+    if (intent.category) {
+        activeIntent = intent.category;
+        const chip = Array.from(document.querySelectorAll('.chip')).find(c => c.innerText.toLowerCase().includes(intent.category));
+        if (chip) {
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+        }
+    }
+    
+    if (intent.maxPrice) {
+        const priceSelector = document.getElementById('price-filter');
+        if (intent.maxPrice <= 500) priceSelector.value = 'under500';
+        else if (intent.maxPrice <= 1000) priceSelector.value = '500-1000';
+        else priceSelector.value = 'over1000';
+    }
+
+    if (intent.keywords.length > 0) {
+        document.getElementById('product-search').value = intent.keywords.join(' ');
+    }
+    
+    filterProducts();
 }
 
 function appendMessage(sender, text, products = []) {
@@ -360,21 +498,72 @@ function appendMessage(sender, text, products = []) {
     body.appendChild(bubble);
 
     if(products && products.length > 0) {
-        const miniGrid = document.createElement('div');
-        miniGrid.className = 'chat-products-mini';
+        // Recommendations Section
+        const recSection = document.createElement('div');
+        recSection.className = 'chat-recommendations';
+        
+        const header = document.createElement('div');
+        header.className = 'recommendation-header';
+        header.innerHTML = `<span>✨</span> Top Matches`;
+        recSection.appendChild(header);
+
+        const detailGrid = document.createElement('div');
+        detailGrid.className = 'chat-products-detailed';
+        
         products.forEach(p => {
-            miniGrid.innerHTML += `
-                <div class="mini-card" onclick="openModal(${p.id})" style="background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 12px; cursor: pointer;">
-                    <img src="${IMAGE_BASE}/${p.image}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px;">
-                    <div style="margin-top:0.25rem; font-weight:700; font-size: 0.8rem;">${p.name}</div>
-                    <div style="color:var(--primary); font-size: 0.75rem;">₹${p.price}</div>
-                    <button class="btn btn-primary btn-small" style="width: 100%; margin-top: 0.5rem; font-size: 0.7rem; padding: 0.25rem;">View</button>
+            const tags = getVibeTags(p.description, p.name, p.price);
+            detailGrid.innerHTML += `
+                <div class="recommendation-card" onclick="openModal(${p.id})">
+                    <span class="rec-badge">Recommended for you</span>
+                    <img src="${IMAGE_BASE}/${p.image}" class="rec-img">
+                    <div class="rec-info">
+                        <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">${p.name}</div>
+                        <div style="color: var(--primary); font-weight: 700; font-size: 0.9rem;">₹${p.price}</div>
+                        <div class="tag-container">
+                            ${tags.map(t => `<span class="tag-badge vibe-${t.type}">${t.label}</span>`).join('')}
+                        </div>
+                    </div>
                 </div>
             `;
         });
-        body.appendChild(miniGrid);
+        recSection.appendChild(detailGrid);
+        body.appendChild(recSection);
+    } else if (sender === 'ai') {
+        // Micro-suggestions if no products found or small results
+        const suggestions = getMicroSuggestions();
+        if (suggestions) {
+            const sugEl = document.createElement('div');
+            sugEl.className = 'micro-suggestion';
+            sugEl.innerHTML = `💡 <b>Vibe Tip:</b> ${suggestions}`;
+            body.appendChild(sugEl);
+        }
     }
+
     body.scrollTop = body.scrollHeight;
+}
+
+function getVibeTags(desc, name, price) {
+    const text = (desc + ' ' + name).toLowerCase();
+    const tags = [];
+    
+    if (text.includes('healthy') || text.includes('organic') || text.includes('fresh')) tags.push({label: 'Healthy 🍃', type: 'healthy'});
+    if (price < 500) tags.push({label: 'Budget 💸', type: 'budget'});
+    if (text.includes('fast') || text.includes('quick') || text.includes('instant')) tags.push({label: 'Fast ⚡', type: 'fast'});
+    if (price > 1000 || text.includes('premium')) tags.push({label: 'Premium ✨', type: 'premium'});
+    
+    // Add specific food tags mentioned in prompt
+    if (text.includes('spicy') || text.includes('chili')) tags.push({label: 'Spicy 🌶️', type: 'default'});
+    if (text.includes('protein') || text.includes('meat') || text.includes('chicken')) tags.push({label: 'High Protein 💪', type: 'default'});
+    
+    return tags;
+}
+
+function getMicroSuggestions() {
+    const query = document.getElementById('chat-input').value.toLowerCase();
+    // Logic based on global state or recent intent
+    if (activeIntent === 'budget') return "Try increasing your budget for more premium options.";
+    if (allProducts.length > 10) return "Explore our trending items section for the most viral vibes.";
+    return "Check out our latest arrivals for more inspiration.";
 }
 async function loadOrders() {
     try {

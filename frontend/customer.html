@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FestMarket - Buy Vibes</title>
+    <title>Aivore - Buy Vibes</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="container">
             <a href="customer.html" class="nav-brand">
-                <span style="font-size: 1.8rem;">🎪</span>
-                <span class="neon-text-primary">FestMarket</span>
+                <img src="assets/logo.png" alt="Aivore Logo" style="height: 35px; margin-right: 10px;">
+                <span class="neon-text-primary">Aivore</span>
             </a>
             
             <button class="nav-toggle" onclick="api.toggleMobileMenu()">☰</button>
@@ -27,6 +27,31 @@
     <div class="container">
         <!-- Products View -->
         <div id="products-view">
+            <!-- Intent Selection Section -->
+            <div class="intent-section">
+                <h3 class="intent-title">What vibe are you looking for?</h3>
+                <div class="intent-chips" id="intent-chips">
+                    <div class="chip" onclick="filterByIntent('healthy', this)">
+                        <span class="chip-emoji">🍃</span> Healthy
+                    </div>
+                    <div class="chip" onclick="filterByIntent('budget', this)">
+                        <span class="chip-emoji">💸</span> Budget
+                    </div>
+                    <div class="chip" onclick="filterByIntent('fast', this)">
+                        <span class="chip-emoji">⚡</span> Fast
+                    </div>
+                    <div class="chip" onclick="filterByIntent('premium', this)">
+                        <span class="chip-emoji">✨</span> Premium
+                    </div>
+                    <div class="chip" onclick="filterByIntent('trending', this)">
+                        <span class="chip-emoji">🔥</span> Trending
+                    </div>
+                    <div class="chip" onclick="filterByIntent('custom', this)">
+                        <span class="chip-emoji">🎯</span> Custom
+                    </div>
+                </div>
+            </div>
+
             <div class="glass-panel" style="margin-bottom: 2rem; padding: 1.5rem;">
                 <div class="d-flex justify-between" style="align-items: center; flex-wrap: wrap; gap: 1.5rem;">
                     <div>

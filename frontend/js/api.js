@@ -1,6 +1,10 @@
-// Update this with your live Railway URL
-const API_BASE = 'https://anat-production.up.railway.app/api';
-const IMAGE_BASE = 'https://anat-production.up.railway.app/uploads';
+// Deployment Configuration
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:5000' 
+    : window.location.origin;
+
+const API_BASE = `${API_BASE_URL}/api`;
+const IMAGE_BASE = `${API_BASE_URL}/uploads`;
 
 const api = {
     getToken: () => localStorage.getItem('token'),

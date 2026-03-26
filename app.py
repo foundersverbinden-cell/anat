@@ -10,19 +10,8 @@ from routes.seller import seller_bp
 import time
 
 app = Flask(__name__)
-# Enable production CORS for Vercel
-# Robust CORS for all Vercel subdomains and local development
-CORS(app, resources={r"/api/*": {
-    "origins": [
-        "https://project-spdvs.vercel.app",
-        "https://festmarket-vibe.vercel.app",
-        r"https://.*\.vercel\.app$",
-        "http://localhost:3000",
-        "http://localhost:5173"
-    ],
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization"]
-}})
+# Enable production CORS
+CORS(app)
 
 # Ensure upload directory exists
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
